@@ -1,0 +1,1500 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>우리 캘린더 🌸</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#D4607A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="우리 캘린더">
+<link rel="apple-touch-icon" href="/icons/icon.svg">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;}
+body{
+  font-family:'Roboto',sans-serif;
+  background:radial-gradient(ellipse at 30% 20%,#3a1a25 0%,#1a0f14 60%,#120810 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;
+}
+.phone-frame{
+  width:390px;height:844px;border-radius:54px;position:relative;overflow:hidden;
+  box-shadow:0 0 0 1px rgba(255,255,255,.09),0 0 0 10px #1c1c1e,0 0 0 11px rgba(255,255,255,.06),0 60px 120px rgba(0,0,0,.6),0 20px 40px rgba(0,0,0,.4);
+  flex-shrink:0;
+}
+.notch{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:126px;height:37px;background:#000;border-radius:20px;z-index:200;pointer-events:none;}
+.app-root{width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;}
+.scr{overflow-y:auto;overflow-x:hidden;-ms-overflow-style:none;scrollbar-width:none;}
+.scr::-webkit-scrollbar{display:none;}
+.ovl{position:absolute;inset:0;background:rgba(0,0,0,.42);z-index:150;display:flex;flex-direction:column;justify-content:flex-end;animation:fdi .2s ease;}
+.sht{border-radius:24px 24px 0 0;max-height:82%;overflow-y:auto;-ms-overflow-style:none;scrollbar-width:none;}
+.sht::-webkit-scrollbar{display:none;}
+.drum-col::-webkit-scrollbar{display:none;}
+@keyframes fdi{from{opacity:0}to{opacity:1}}
+@keyframes sup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.sht{animation:sup .32s cubic-bezier(.32,.72,0,1);}
+input,textarea{font-family:'Roboto',sans-serif;border:none;outline:none;background:transparent;width:100%;resize:none;}
+button{font-family:'Roboto',sans-serif;border:none;cursor:pointer;background:none;}
+</style>
+</head>
+<body>
+<div class="phone-frame" id="frame">
+  <div class="notch"></div>
+  <div id="app-mount" class="app-root"></div>
+</div>
+
+<script>
+(function(){
+  function scale(){
+    var frame=document.getElementById('frame');
+    var scaleX=Math.min(1,(window.innerWidth-40)/390);
+    var scaleY=Math.min(1,(window.innerHeight-40)/844);
+    var s=Math.min(scaleX,scaleY);
+    frame.style.transform='scale('+s+')';
+    frame.style.transformOrigin='center center';
+  }
+  scale();
+  window.addEventListener('resize',scale);
+})();
+</script>
+
+<!-- ★ Firebase 설정 — Firebase Console > 프로젝트 설정 > 웹 앱에서 복사 -->
+<script>
+const firebaseConfig = {
+  apiKey:            "AIzaSyCkP9JqElAfnRxM0PV31cxKHBEJ8-gsMTU",
+  authDomain:        "our-calendar-79fda.firebaseapp.com",
+  projectId:         "our-calendar-79fda",
+  storageBucket:     "our-calendar-79fda.firebasestorage.app",
+  messagingSenderId: "366081439342",
+  appId:             "1:366081439342:web:2002037e35d5ffb696987f",
+  measurementId:     "G-XBTFLXEX6R"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+</script>
+
+<script type="text/babel">
+const {useState,useEffect,useRef}=React;
+
+/* ─── constants ─── */
+const TODAY=new Date(),DMS=86400000;
+const TODAY_STR=d2s(TODAY);
+const WD=['일','월','화','수','목','금','토'];
+
+function d2s(d){
+  return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function dSince(d){return Math.floor((TODAY-d)/DMS)+1;}
+
+/* ─── user profiles ─── */
+const U={
+  me:     {name:'민준', color:'#4B8FE0', light:'rgba(75,143,224,.12)'},
+  partner:{name:'서연', color:'#E86D8A', light:'rgba(232,109,138,.12)'},
+  both:   {name:'함께', color:'#9B72C8', light:'rgba(155,114,200,.12)'},
+};
+
+/* ─── theme (Minimal / B) ─── */
+const V={
+  bg:'#F9F9F9', surf:'#FFFFFF', sC:'#F2F2F2',
+  pri:'#D4607A', pC:'#FCEAED',
+  oS:'#1C1C1E', oSV:'#6E6E73', ol:'#E5E5EA',
+  ban:'linear-gradient(130deg,#FCE4EC 0%,#FFF3E0 100%)', bT:'#5C1F30',
+  tOn:'#D4607A', tOff:'#C7C7CC',
+};
+
+/* ─── sample events ─── */
+const now=new Date();
+const yr=now.getFullYear(),mo=now.getMonth();
+function ds(y,m,d){return`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;}
+
+const EV0=[
+  {id:1,  ti:'팀 미팅',        dt:ds(yr,mo+1,3),  u:'me',      aD:true,  s:'',     e:'',     m:''},
+  {id:2,  ti:'헬스장',         dt:ds(yr,mo+1,10), u:'me',      aD:false, s:'18:00',e:'20:00',m:'운동 파이팅! 💪'},
+  {id:3,  ti:'친구 약속',      dt:ds(yr,mo+1,15), u:'me',      aD:false, s:'19:00',e:'',     m:'홍대 약속'},
+  {id:4,  ti:'재택근무',       dt:ds(yr,mo+1,22), u:'me',      aD:true,  s:'',     e:'',     m:''},
+  {id:5,  ti:'미용실',         dt:ds(yr,mo+1,5),  u:'partner', aD:false, s:'14:00',e:'15:30',m:''},
+  {id:6,  ti:'요가 클래스',    dt:ds(yr,mo+1,10), u:'partner', aD:false, s:'07:00',e:'08:00',m:''},
+  {id:7,  ti:'가족 저녁',      dt:ds(yr,mo+1,17), u:'partner', aD:false, s:'18:00',e:'',     m:'부모님 댁'},
+  {id:8,  ti:'재택근무',       dt:ds(yr,mo+1,22), u:'partner', aD:true,  s:'',     e:'',     m:''},
+  {id:9,  ti:'영화 보기 🎬',   dt:ds(yr,mo+1,28), u:'both',    aD:false, s:'19:30',e:'22:00',m:'예매 완료!'},
+  {id:10, ti:'한강 피크닉 🧺', dt:ds(yr,mo+1,10), u:'both',    aD:false, s:'14:00',e:'18:00',m:'도시락 준비하기'},
+  {id:11, ti:'분기 회의',      dt:ds(yr,mo,20),   u:'me',      aD:false, s:'10:00',e:'12:00',m:''},
+  {id:12, ti:'부모님 방문',    dt:ds(yr,mo,15),   u:'partner', aD:true,  s:'',     e:'',     m:''},
+  {id:13, ti:'병원 예약',      dt:ds(yr,mo+1,8),  u:'partner', aD:false, s:'15:30',e:'',     m:'정기 검진'},
+  {id:14, ti:'독서 모임',      dt:ds(yr,mo+1,12), u:'me',      aD:false, s:'20:00',e:'',     m:''},
+  {id:15, ti:'데이트 ☕️',     dt:TODAY_STR,       u:'both',    aD:false, s:'16:00',e:'',     m:'성수동 카페'},
+];
+
+function buildAnnList(cs,names,bdays){
+  // cs = Date|null; bdays = {me:'YYYY-MM-DD'|'', partner:'YYYY-MM-DD'|''}
+  const list=[];let id=1;
+  if(cs){
+    const sMo=cs.getMonth()+1,sDy=cs.getDate(),sYr=cs.getFullYear();
+    list.push({id:id++,ti:'처음 만난 날 ❤️',mo:sMo,dy:sDy,yr:null,rc:true});
+    const d100=new Date(cs.getTime()+99*DMS);
+    list.push({id:id++,ti:'100일 기념 🎉',mo:d100.getMonth()+1,dy:d100.getDate(),yr:d100.getFullYear(),rc:false});
+    const cYr=TODAY.getFullYear();
+    for(let y=sYr+1;y<=cYr+3;y++){
+      const n=y-sYr,em=n===1?'🥂':n===2?'🎊':'✨';
+      list.push({id:id++,ti:`${n}주년 ${em}`,mo:sMo,dy:sDy,yr:y,rc:false});
+    }
+  }
+  if(bdays.me){const[,bm,bd]=bdays.me.split('-').map(Number);list.push({id:id++,ti:`${names.me} 생일 🎂`,mo:bm,dy:bd,yr:null,rc:true});}
+  if(bdays.partner){const[,bm,bd]=bdays.partner.split('-').map(Number);list.push({id:id++,ti:`${names.partner} 생일 🎂`,mo:bm,dy:bd,yr:null,rc:true});}
+  list.push({id:id++,ti:'크리스마스 🎄',mo:12,dy:25,yr:null,rc:true});
+  return list;
+}
+
+const BK0=[
+  {id:1, ti:'제주도 여행',       done:true, cat:'여행'},
+  {id:2, ti:'오사카 여행',       done:false,cat:'여행'},
+  {id:3, ti:'요리 클래스 함께',  done:true, cat:'데이트'},
+  {id:4, ti:'커플 스튜디오 사진',done:false,cat:'데이트'},
+  {id:5, ti:'야경 보러 가기',    done:false,cat:'데이트'},
+  {id:6, ti:'1박 캠핑',          done:false,cat:'여행'},
+  {id:7, ti:'뮤지컬 보기',       done:true, cat:'문화'},
+  {id:8, ti:'별 보러 가기',      done:false,cat:'데이트'},
+  {id:9, ti:'바다 드라이브',     done:false,cat:'데이트'},
+  {id:10,ti:'스노클링',          done:false,cat:'여행'},
+];
+
+function annDate(a){
+  if(a.yr) return new Date(a.yr,a.mo-1,a.dy);
+  const ty=new Date(TODAY.getFullYear(),a.mo-1,a.dy);
+  return ty>=TODAY?ty:new Date(TODAY.getFullYear()+1,a.mo-1,a.dy);
+}
+
+/* ═══════════════════════════════════════
+   STATUS BAR
+══════════════════════════════════════ */
+function SBar(){
+  const [time,setTime]=useState('');
+  useEffect(()=>{
+    function tick(){
+      const n=new Date();
+      setTime(`${n.getHours()}:${String(n.getMinutes()).padStart(2,'0')}`);
+    }
+    tick();
+    const t=setInterval(tick,10000);
+    return()=>clearInterval(t);
+  },[]);
+  return(
+    <div style={{height:50,padding:'16px 22px 0',display:'flex',alignItems:'center',justifyContent:'space-between',background:V.bg,flexShrink:0}}>
+      <span style={{fontSize:15,fontWeight:600,color:V.oS,letterSpacing:-.3}}>{time}</span>
+      <div style={{display:'flex',gap:5,alignItems:'center',color:V.oS}}>
+        <span className="material-symbols-outlined" style={{fontSize:14,fontVariationSettings:"'wght' 500"}}>signal_cellular_alt</span>
+        <span className="material-symbols-outlined" style={{fontSize:14,fontVariationSettings:"'wght' 500"}}>wifi</span>
+        <span className="material-symbols-outlined" style={{fontSize:14,fontVariationSettings:"'wght' 500"}}>battery_5_bar</span>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   APP HEADER
+══════════════════════════════════════ */
+function AHdr({names}){
+  return(
+    <div style={{padding:'2px 20px 8px',background:V.bg,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+      <span style={{fontSize:20,fontWeight:700,color:V.pri,letterSpacing:-.5}}>깡❤️쭌 캘린더</span>
+      <div style={{display:'flex'}}>
+        {['me','partner'].map((k,i)=>(
+          <div key={k} style={{width:32,height:32,borderRadius:'50%',background:U[k].color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,color:'#fff',fontWeight:700,marginLeft:i>0?-6:0,border:'2px solid '+V.bg,zIndex:i===0?1:2}}>{(names[k]||'?')[0]}</div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   CALENDAR TAB
+══════════════════════════════════════ */
+function CalTab({evs,addEv,delEv,updateEv,coupleStart,annList,names}){
+  const [cm,setCm]=useState(new Date(TODAY.getFullYear(),TODAY.getMonth(),1));
+  const [sel,setSel]=useState(TODAY_STR);
+  const [showAdd,setAdd]=useState(false);
+  const [det,setDet]=useState(null);
+  const [edit,setEdit]=useState(null);
+  const yr=cm.getFullYear(),mo=cm.getMonth();
+  const fdw=new Date(yr,mo,1).getDay(),dim=new Date(yr,mo+1,0).getDate();
+  const selEvs=evs.filter(e=>e.ed?sel>=e.dt&&sel<=e.ed:e.dt===sel);
+
+  const cells=[];
+  for(let i=0;i<fdw;i++) cells.push(null);
+  for(let d=1;d<=dim;d++) cells.push(d);
+
+  const procAnn=annList.map(a=>({...a,nd:annDate(a)})).filter(a=>a.nd>=TODAY).sort((a,b)=>a.nd-b.nd);
+  const nextAnn=procAnn[0];
+  const naDays=nextAnn?Math.ceil((nextAnn.nd-TODAY)/DMS):null;
+
+  return(
+    <div style={{display:'flex',flexDirection:'column',height:'100%',background:V.bg,position:'relative',overflow:'hidden'}}>
+
+      {/* D-Day Banner */}
+      <div style={{margin:'4px 14px 6px',borderRadius:22,background:V.ban,padding:'14px 18px',display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0}}>
+        <div>
+          <div style={{fontSize:11,fontWeight:500,color:V.bT,opacity:.65,marginBottom:3,letterSpacing:.3}}>우리가 만난 지</div>
+          <div style={{fontSize:28,fontWeight:700,color:V.bT,letterSpacing:-1,lineHeight:1}}>
+            {dSince(coupleStart).toLocaleString()}<span style={{fontSize:16,fontWeight:600,marginLeft:4}}>일째 ❤️</span>
+          </div>
+          {nextAnn&&<div style={{fontSize:11,color:V.bT,opacity:.7,marginTop:5,display:'flex',alignItems:'center',gap:4}}>
+            <span className="material-symbols-outlined" style={{fontSize:13,fontVariationSettings:"'FILL' 1"}}>event</span>
+            {nextAnn.ti.replace(/[\u{1F300}-\u{1FFFF}❤️]/gu,'').trim()} · D-{naDays}
+          </div>}
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:6,alignItems:'flex-end',flexShrink:0}}>
+          {['me','partner'].map(u=>(
+            <div key={u} style={{display:'flex',gap:5,alignItems:'center'}}>
+              <div style={{width:8,height:8,borderRadius:'50%',background:U[u].color,boxShadow:'0 0 0 2px rgba(255,255,255,.5)'}}/>
+              <span style={{fontSize:11,color:V.bT,fontWeight:600}}>{names[u]}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Month nav */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 16px',flexShrink:0,marginBottom:2}}>
+        <button onClick={()=>setCm(new Date(yr,mo-1,1))} style={{padding:6,color:V.oSV,display:'flex',alignItems:'center'}}>
+          <span className="material-symbols-outlined" style={{fontSize:22}}>chevron_left</span>
+        </button>
+        <span style={{fontSize:15,fontWeight:600,color:V.oS,letterSpacing:-.3}}>{yr}년 {mo+1}월</span>
+        <button onClick={()=>setCm(new Date(yr,mo+1,1))} style={{padding:6,color:V.oSV,display:'flex',alignItems:'center'}}>
+          <span className="material-symbols-outlined" style={{fontSize:22}}>chevron_right</span>
+        </button>
+      </div>
+
+      {/* Day-of-week headers */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',padding:'0 10px',flexShrink:0,marginBottom:2}}>
+        {WD.map((d,i)=>(
+          <div key={d} style={{textAlign:'center',fontSize:11,fontWeight:600,letterSpacing:.2,color:i===0?'#FF453A':i===6?'#5E8EE0':V.oSV,padding:'2px 0'}}>{d}</div>
+        ))}
+      </div>
+
+      {/* Calendar grid — week rows with spanning bars */}
+      <div style={{padding:'0 10px',flexShrink:0}}>
+        {Array.from({length:Math.ceil(cells.length/7)},(_,w)=>{
+          const wCells=cells.slice(w*7,(w+1)*7);
+          const wDates=wCells.map(day=>
+            day?`${yr}-${String(mo+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`:null
+          );
+          const nonNull=wDates.filter(Boolean);
+          if(!nonNull.length) return null;
+          const wStart=nonNull[0],wEnd=nonNull[nonNull.length-1];
+
+          /* 이 주에 걸치는 연일 일정 */
+          const wBars=evs.filter(e=>e.ed&&e.ed!==e.dt&&e.dt<=wEnd&&e.ed>=wStart);
+          const cellH=44+wBars.length*13;
+
+          return(
+            <div key={w} style={{position:'relative',marginBottom:2}}>
+              {/* 날짜 셀 */}
+              <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)'}}>
+                {wCells.map((day,col)=>{
+                  if(!day) return <div key={`e${w}${col}`} style={{minHeight:cellH}}/>;
+                  const dateStr=wDates[col];
+                  /* 단일 일정만 pill 표시 (연일 일정은 bar로 표시) */
+                  const sDEvs=evs.filter(e=>(!e.ed||e.ed===e.dt)&&e.dt===dateStr);
+                  const isSel=dateStr===sel,isTod=dateStr===TODAY_STR;
+                  return(
+                    <div key={dateStr} onClick={()=>setSel(dateStr)}
+                      style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'3px 1px 4px',
+                        cursor:'pointer',borderRadius:10,minHeight:cellH,
+                        background:isSel?V.pri:isTod?V.pC:'transparent',transition:'background .15s'}}>
+                      <span style={{fontSize:13,fontWeight:isSel?700:isTod?600:400,lineHeight:'20px',
+                        color:isSel?'#fff':isTod?V.pri:col===0?'#FF453A':col===6?'#5E8EE0':V.oS}}>
+                        {day}
+                      </span>
+                      {sDEvs.length>0&&(
+                        <div style={{marginTop:2,fontSize:7.5,fontWeight:600,
+                          background:isSel?'rgba(255,255,255,.22)':U[sDEvs[0].u]?.light||'rgba(155,114,200,.12)',
+                          color:isSel?'rgba(255,255,255,.9)':U[sDEvs[0].u]?.color||'#9B72C8',
+                          borderRadius:4,padding:'1px 4px',maxWidth:'95%',overflow:'hidden',
+                          whiteSpace:'nowrap',textOverflow:'ellipsis',letterSpacing:.1}}>
+                          {sDEvs[0].ti.replace(/[\u{1F300}-\u{1FFFF}❤️\u{2700}-\u{27BF}]/gu,'').trim().slice(0,5)}
+                          {sDEvs.length>1?` +${sDEvs.length-1}`:''}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* 연일 일정 spanning bar */}
+              {wBars.map((ev,ri)=>{
+                /* 이 주에서의 시작·끝 컬럼 계산 */
+                const sc=wDates.findIndex(d=>d&&d>=ev.dt);
+                const ec=wDates.reduce((a,d,i)=>d&&d<=ev.ed?i:a,-1);
+                if(sc<0||ec<0) return null;
+                const sh=ev.dt>=wStart; /* 이 주에서 시작 */
+                const eh=ev.ed<=wEnd;   /* 이 주에서 종료 */
+                const u=U[ev.u]||U.me;
+                return(
+                  <div key={ev.id} style={{
+                    position:'absolute',top:26+ri*13,
+                    left:`${sc*100/7}%`,width:`${(ec-sc+1)*100/7}%`,
+                    padding:`0 ${eh?3:0}px 0 ${sh?4:0}px`,
+                    pointerEvents:'none',
+                  }}>
+                    <div style={{
+                      height:11,background:u.color,opacity:.88,
+                      borderRadius:`${sh?6:0}px ${eh?6:0}px ${eh?6:0}px ${sh?6:0}px`,
+                      display:'flex',alignItems:'center',paddingLeft:sh?3:0,overflow:'hidden',
+                    }}>
+                      {sh&&<span style={{fontSize:7.5,fontWeight:700,color:'#fff',whiteSpace:'nowrap',letterSpacing:.1,opacity:.95}}>
+                        {ev.ti.replace(/[\u{1F300}-\u{1FFFF}❤️\u{2700}-\u{27BF}]/gu,'').trim().slice(0,9)}
+                      </span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Events for selected date */}
+      <div className="scr" style={{flex:1,padding:'10px 14px 88px',marginTop:6}}>
+        <div style={{fontSize:11,fontWeight:700,color:V.oSV,marginBottom:8,letterSpacing:.8,textTransform:'uppercase'}}>
+          {sel===TODAY_STR?'오늘':sel.replace(/-/g,'.')}
+        </div>
+        {selEvs.length===0
+          ?<div style={{textAlign:'center',padding:'18px 0',color:V.oSV,fontSize:13}}>
+            <span className="material-symbols-outlined" style={{fontSize:30,display:'block',marginBottom:6,opacity:.25}}>event_note</span>
+            일정이 없어요
+          </div>
+          :selEvs.map(ev=>(
+            <EvCard key={ev.id} ev={ev} names={names} onClick={()=>setDet(ev)}/>
+          ))
+        }
+        <button onClick={()=>setAdd(true)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',border:`1.5px dashed ${V.ol}`,borderRadius:12,padding:'10px 14px',color:V.oSV,fontSize:13,marginTop:6}}>
+          <span className="material-symbols-outlined" style={{fontSize:18}}>add</span>일정 추가
+        </button>
+      </div>
+
+      {/* FAB */}
+      <button onClick={()=>setAdd(true)} style={{position:'absolute',bottom:16,right:18,width:52,height:52,borderRadius:'50%',background:V.pri,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 4px 16px rgba(212,96,122,.45)',zIndex:10}}>
+        <span className="material-symbols-outlined" style={{fontSize:26}}>add</span>
+      </button>
+
+      {showAdd&&<AddSht sel={sel} onClose={()=>setAdd(false)} onAdd={ev=>{addEv(ev);setAdd(false);}} names={names}/>}
+      {det&&<DetSht ev={det} names={names} onClose={()=>setDet(null)}
+        onDel={id=>{delEv(id);setDet(null);}}
+        onEdit={ev=>{setEdit(ev);setDet(null);}}/>}
+      {edit&&<EditSht ev={edit} names={names} onClose={()=>setEdit(null)}
+        onSave={updated=>{updateEv(updated);setEdit(null);}}/>}
+    </div>
+  );
+}
+
+function EvCard({ev,onClick,names}){
+  const u=U[ev.u]||U.me;
+  const dName=ev.u==='both'?'함께':ev.u==='me'?(names?.me||u.name):(names?.partner||u.name);
+  return(
+    <div onClick={onClick} style={{display:'flex',alignItems:'stretch',background:V.surf,borderRadius:14,marginBottom:8,cursor:'pointer',border:`1px solid ${V.ol}`,overflow:'hidden',boxShadow:'0 1px 4px rgba(0,0,0,.05)'}}>
+      <div style={{width:4,background:u.color,flexShrink:0,borderRadius:'4px 0 0 4px'}}/>
+      <div style={{flex:1,padding:'10px 12px'}}>
+        <div style={{fontSize:14,fontWeight:500,color:V.oS,letterSpacing:-.1}}>{ev.ti}</div>
+        <div style={{fontSize:11,color:V.oSV,marginTop:2}}>
+          {ev.ed&&ev.ed!==ev.dt
+            ?<span style={{background:U[ev.u]?.light,color:U[ev.u]?.color,borderRadius:4,padding:'1px 5px',fontWeight:600,marginRight:5,fontSize:10}}>연일</span>
+            :null}
+          {ev.ed&&ev.ed!==ev.dt
+            ?`${ev.dt.replace(/-/g,'.')} ~ ${ev.ed.replace(/-/g,'.')}`
+            :ev.aD?'하루 종일':`${ev.s}${ev.e?` – ${ev.e}`:''}`}
+          <span style={{margin:'0 5px',opacity:.4}}>·</span>
+          <span style={{color:u.color,fontWeight:500}}>{dName}</span>
+        </div>
+      </div>
+      <div style={{display:'flex',alignItems:'center',paddingRight:12,color:V.ol}}>
+        <span className="material-symbols-outlined" style={{fontSize:16}}>chevron_right</span>
+      </div>
+    </div>
+  );
+}
+
+function Toggle({on,onToggle}){
+  return(
+    <div onClick={onToggle} style={{width:46,height:26,borderRadius:13,background:on?V.pri:V.ol,position:'relative',cursor:'pointer',transition:'background .2s',flexShrink:0}}>
+      <div style={{position:'absolute',top:3,left:on?23:3,width:20,height:20,borderRadius:'50%',background:'#fff',transition:'left .2s',boxShadow:'0 1px 3px rgba(0,0,0,.22)'}}/>
+    </div>
+  );
+}
+
+/* ── 인앱 날짜 피커 캘린더 ── */
+function CalPicker({value,min,onSelect}){
+  const init=value?new Date(value.replace(/-/g,'/')):new Date();
+  const [cm,setCm]=useState(new Date(init.getFullYear(),init.getMonth(),1));
+  const yr=cm.getFullYear(),mo=cm.getMonth();
+  const fdw=new Date(yr,mo,1).getDay(),dim=new Date(yr,mo+1,0).getDate();
+  const cells=[];
+  for(let i=0;i<fdw;i++) cells.push(null);
+  for(let d=1;d<=dim;d++) cells.push(d);
+
+  return(
+    <div style={{background:V.surf,borderRadius:16,border:`1px solid ${V.ol}`,padding:'10px 6px 8px',marginTop:6,boxShadow:'0 4px 20px rgba(0,0,0,.08)'}}>
+      {/* 월 이동 */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 4px',marginBottom:6}}>
+        <button onClick={()=>setCm(new Date(yr,mo-1,1))} style={{padding:4,color:V.oSV,display:'flex',alignItems:'center'}}>
+          <span className="material-symbols-outlined" style={{fontSize:20}}>chevron_left</span>
+        </button>
+        <span style={{fontSize:13,fontWeight:600,color:V.oS,letterSpacing:-.2}}>{yr}년 {mo+1}월</span>
+        <button onClick={()=>setCm(new Date(yr,mo+1,1))} style={{padding:4,color:V.oSV,display:'flex',alignItems:'center'}}>
+          <span className="material-symbols-outlined" style={{fontSize:20}}>chevron_right</span>
+        </button>
+      </div>
+      {/* 요일 헤더 */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',marginBottom:2}}>
+        {WD.map((d,i)=>(
+          <div key={d} style={{textAlign:'center',fontSize:10,fontWeight:600,color:i===0?'#FF453A':i===6?'#5E8EE0':V.oSV,padding:'1px 0'}}>{d}</div>
+        ))}
+      </div>
+      {/* 날짜 그리드 */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'1px 0'}}>
+        {cells.map((day,i)=>{
+          if(!day) return <div key={`e${i}`}/>;
+          const ds=`${yr}-${String(mo+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+          const isSel=ds===value;
+          const isTod=ds===TODAY_STR;
+          const disabled=min&&ds<min;
+          const dow=(fdw+day-1)%7;
+          return(
+            <div key={ds}
+              onClick={()=>!disabled&&onSelect(ds)}
+              style={{display:'flex',alignItems:'center',justifyContent:'center',height:32,borderRadius:8,cursor:disabled?'default':'pointer',background:isSel?V.pri:isTod?V.pC:'transparent',opacity:disabled?.3:1,transition:'background .12s'}}>
+              <span style={{fontSize:12,fontWeight:isSel?700:isTod?600:400,color:isSel?'#fff':isTod?V.pri:dow===0?'#FF453A':dow===6?'#5E8EE0':V.oS}}>{day}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ── 날짜 탭 버튼 ── */
+function DateTab({label,value,active,onClick}){
+  return(
+    <button onClick={onClick} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,padding:'9px 6px',borderRadius:12,border:`1.5px solid ${active?V.pri:V.ol}`,background:active?V.pC:V.sC,cursor:'pointer',transition:'all .15s',userSelect:'none'}}>
+      <span style={{fontSize:10,fontWeight:600,color:active?V.pri:V.oSV,letterSpacing:.4,textTransform:'uppercase'}}>{label}</span>
+      <span style={{fontSize:13,fontWeight:600,color:active?V.pri:V.oS,letterSpacing:-.2}}>{value.replace(/-/g,'.')}</span>
+    </button>
+  );
+}
+
+function AddSht({sel,onClose,onAdd,names}){
+  const [ti,setTi]=useState('');
+  const [u,setU]=useState('me');
+  const [sd,setSd]=useState(sel);
+  const [ed,setEd]=useState(sel);
+  const [picker,setPicker]=useState(null); // null | 'start' | 'end'
+  const [aD,setAD]=useState(true);
+  const [ts,setTs]=useState('12:00');
+  const [te,setTe]=useState('');
+  const [mm,setMm]=useState('');
+
+  const isRange=sd!==ed;
+
+  function togglePicker(which){
+    setPicker(p=>p===which?null:which);
+  }
+
+  function handlePickStart(v){
+    setSd(v);
+    if(v>ed) setEd(v);
+    setPicker('end');
+  }
+
+  function handlePickEnd(v){
+    setEd(v);
+    setPicker(null);
+  }
+
+  function submit(){
+    if(!ti.trim()) return;
+    onAdd({
+      ti:ti.trim(),
+      dt:sd,
+      ed:isRange?ed:null,
+      u,
+      aD:isRange?true:aD,
+      s:isRange||aD?'':ts,
+      e:isRange||aD?'':te,
+      m:mm.trim(),
+    });
+  }
+
+  return(
+    <div className="ovl" onClick={onClose}>
+      <div className="sht" style={{background:V.surf,padding:'12px 20px 44px'}} onClick={e=>e.stopPropagation()}>
+        <div style={{width:38,height:4,borderRadius:2,background:'rgba(0,0,0,.1)',margin:'0 auto 18px'}}/>
+        <div style={{fontSize:17,fontWeight:600,color:V.oS,marginBottom:16,letterSpacing:-.3}}>새 일정</div>
+
+        <FRow icon="title">
+          <input value={ti} onChange={e=>setTi(e.target.value)} placeholder="일정 제목" style={{fontSize:15,color:V.oS,fontWeight:500}} autoFocus/>
+        </FRow>
+
+        <FRow icon="person">
+          <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
+            {Object.entries(U).map(([id,info])=>(
+              <button key={id} onClick={()=>setU(id)} style={{padding:'5px 13px',borderRadius:20,background:u===id?info.color:info.light,color:u===id?'#fff':info.color,fontSize:12,fontWeight:600,transition:'all .15s'}}>
+                {id==='both'?'함께 🤝':(names?.[id]||info.name)}
+              </button>
+            ))}
+          </div>
+        </FRow>
+
+        {/* 날짜 행 */}
+        <FRow icon="calendar_today" top>
+          <div style={{flex:1}}>
+            <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <DateTab label="시작일" value={sd} active={picker==='start'} onClick={()=>togglePicker('start')}/>
+              <span style={{fontSize:16,color:V.oSV,flexShrink:0}}>~</span>
+              <DateTab label="종료일" value={ed} active={picker==='end'} onClick={()=>togglePicker('end')}/>
+            </div>
+            {picker==='start'&&<CalPicker value={sd} onSelect={handlePickStart}/>}
+            {picker==='end'&&<CalPicker value={ed} min={sd} onSelect={handlePickEnd}/>}
+          </div>
+        </FRow>
+
+        {/* 시간 */}
+        {!isRange&&!picker&&(
+          <FRow icon="schedule">
+            <span style={{flex:1,fontSize:14,color:V.oS}}>하루 종일</span>
+            <Toggle on={aD} onToggle={()=>setAD(!aD)}/>
+          </FRow>
+        )}
+        {!isRange&&!picker&&!aD&&(<>
+          <FRow icon="">
+            <span style={{fontSize:12,color:V.oSV,width:28,flexShrink:0}}>시작</span>
+            <input type="time" value={ts} onChange={e=>setTs(e.target.value)} style={{fontSize:14,color:V.oS,flex:1}}/>
+          </FRow>
+          <FRow icon="">
+            <span style={{fontSize:12,color:V.oSV,width:28,flexShrink:0}}>종료</span>
+            <input type="time" value={te} onChange={e=>setTe(e.target.value)} style={{fontSize:14,color:V.oS,flex:1}}/>
+          </FRow>
+        </>)}
+
+        {!picker&&(
+          <FRow icon="notes" top>
+            <textarea value={mm} onChange={e=>setMm(e.target.value)} placeholder="메모 (선택사항)" rows={2} style={{fontSize:14,color:V.oS}}/>
+          </FRow>
+        )}
+
+        <button onClick={submit} style={{width:'100%',padding:14,borderRadius:14,background:ti.trim()?V.pri:'rgba(0,0,0,.08)',color:ti.trim()?'#fff':V.oSV,fontSize:15,fontWeight:600,marginTop:18,transition:'background .2s,color .2s',letterSpacing:-.1}}>저장하기</button>
+      </div>
+    </div>
+  );
+}
+
+function DetSht({ev,onClose,onDel,onEdit,names}){
+  const u=U[ev.u]||U.me;
+  const dName=ev.u==='both'?'함께':ev.u==='me'?(names?.me||u.name):(names?.partner||u.name);
+  const dateVal=ev.ed&&ev.ed!==ev.dt
+    ?`${ev.dt.replace(/-/g,'.')} ~ ${ev.ed.replace(/-/g,'.')}`
+    :ev.dt.replace(/-/g,'.');
+  const rows=[
+    {ic:'calendar_today',lb:'날짜',val:dateVal},
+    ...(!ev.ed||ev.ed===ev.dt?[{ic:'schedule',lb:'시간',val:ev.aD?'하루 종일':`${ev.s}${ev.e?` – ${ev.e}`:''}`}]:[]),
+    ...(ev.m?[{ic:'notes',lb:'메모',val:ev.m}]:[]),
+  ];
+  return(
+    <div className="ovl" onClick={onClose}>
+      <div className="sht" style={{background:V.surf,padding:'12px 20px 44px'}} onClick={e=>e.stopPropagation()}>
+        <div style={{width:38,height:4,borderRadius:2,background:'rgba(0,0,0,.1)',margin:'0 auto 18px'}}/>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:18}}>
+          <div style={{width:44,height:44,borderRadius:12,background:u.light,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+            <span className="material-symbols-outlined" style={{fontSize:22,color:u.color,fontVariationSettings:"'FILL' 1"}}>event</span>
+          </div>
+          <div>
+            <div style={{fontSize:17,fontWeight:600,color:V.oS,letterSpacing:-.3}}>{ev.ti}</div>
+            <div style={{fontSize:12,color:u.color,fontWeight:500,marginTop:1}}>{dName}의 일정</div>
+          </div>
+        </div>
+        {rows.map(r=>(
+          <div key={r.ic} style={{display:'flex',gap:12,alignItems:'flex-start',marginBottom:14}}>
+            <span className="material-symbols-outlined" style={{fontSize:18,color:V.oSV,flexShrink:0,marginTop:1}}>{r.ic}</span>
+            <div>
+              <div style={{fontSize:11,color:V.oSV,marginBottom:1,letterSpacing:.3}}>{r.lb}</div>
+              <div style={{fontSize:14,color:V.oS,fontWeight:400,lineHeight:1.4}}>{r.val}</div>
+            </div>
+          </div>
+        ))}
+        <div style={{display:'flex',gap:10,marginTop:8}}>
+          <button onClick={()=>onDel(ev.id)} style={{flex:1,padding:13,borderRadius:14,background:'#FFF0F2',color:'#D1213A',fontSize:14,fontWeight:600}}>
+            일정 삭제
+          </button>
+          <button onClick={()=>onEdit(ev)} style={{flex:1,padding:13,borderRadius:14,background:V.pC,color:V.pri,fontSize:14,fontWeight:600}}>
+            일정 변경
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── 일정 변경 시트 ── */
+function EditSht({ev,onClose,onSave,names}){
+  const [ti,setTi]=useState(ev.ti);
+  const [u,setU]=useState(ev.u);
+  const [sd,setSd]=useState(ev.dt);
+  const [ed,setEd]=useState(ev.ed||ev.dt);
+  const [picker,setPicker]=useState(null);
+  const [aD,setAD]=useState(ev.aD);
+  const [ts,setTs]=useState(ev.s||'12:00');
+  const [te,setTe]=useState(ev.e||'');
+  const [mm,setMm]=useState(ev.m||'');
+
+  const isRange=sd!==ed;
+
+  function togglePicker(which){setPicker(p=>p===which?null:which);}
+  function handlePickStart(v){setSd(v);if(v>ed)setEd(v);setPicker('end');}
+  function handlePickEnd(v){setEd(v);setPicker(null);}
+
+  function submit(){
+    if(!ti.trim()) return;
+    onSave({
+      ...ev,
+      ti:ti.trim(),
+      dt:sd,
+      ed:isRange?ed:null,
+      u,
+      aD:isRange?true:aD,
+      s:isRange||aD?'':ts,
+      e:isRange||aD?'':te,
+      m:mm.trim(),
+    });
+  }
+
+  return(
+    <div className="ovl" onClick={onClose}>
+      <div className="sht" style={{background:V.surf,padding:'12px 20px 44px'}} onClick={e=>e.stopPropagation()}>
+        <div style={{width:38,height:4,borderRadius:2,background:'rgba(0,0,0,.1)',margin:'0 auto 14px'}}/>
+
+        {/* 헤더 */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+          <div style={{fontSize:17,fontWeight:600,color:V.oS,letterSpacing:-.3}}>일정 변경</div>
+          <button onClick={onClose} style={{padding:4,color:V.oSV,display:'flex',alignItems:'center'}}>
+            <span className="material-symbols-outlined" style={{fontSize:22}}>close</span>
+          </button>
+        </div>
+
+        {/* 제목 */}
+        <FRow icon="title">
+          <input value={ti} onChange={e=>setTi(e.target.value)} placeholder="일정 제목" style={{fontSize:15,color:V.oS,fontWeight:500}} autoFocus/>
+        </FRow>
+
+        {/* 담당 */}
+        <FRow icon="person">
+          <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
+            {Object.entries(U).map(([id,info])=>(
+              <button key={id} onClick={()=>setU(id)} style={{padding:'5px 13px',borderRadius:20,background:u===id?info.color:info.light,color:u===id?'#fff':info.color,fontSize:12,fontWeight:600,transition:'all .15s'}}>
+                {id==='both'?'함께 🤝':(names?.[id]||info.name)}
+              </button>
+            ))}
+          </div>
+        </FRow>
+
+        {/* 날짜 */}
+        <FRow icon="calendar_today" top>
+          <div style={{flex:1}}>
+            <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <DateTab label="시작일" value={sd} active={picker==='start'} onClick={()=>togglePicker('start')}/>
+              <span style={{fontSize:16,color:V.oSV,flexShrink:0}}>~</span>
+              <DateTab label="종료일" value={ed} active={picker==='end'} onClick={()=>togglePicker('end')}/>
+            </div>
+            {picker==='start'&&<CalPicker value={sd} onSelect={handlePickStart}/>}
+            {picker==='end'&&<CalPicker value={ed} min={sd} onSelect={handlePickEnd}/>}
+          </div>
+        </FRow>
+
+        {/* 시간 */}
+        {!isRange&&!picker&&(
+          <FRow icon="schedule">
+            <span style={{flex:1,fontSize:14,color:V.oS}}>하루 종일</span>
+            <Toggle on={aD} onToggle={()=>setAD(!aD)}/>
+          </FRow>
+        )}
+        {!isRange&&!picker&&!aD&&(<>
+          <FRow icon="">
+            <span style={{fontSize:12,color:V.oSV,width:28,flexShrink:0}}>시작</span>
+            <input type="time" value={ts} onChange={e=>setTs(e.target.value)} style={{fontSize:14,color:V.oS,flex:1}}/>
+          </FRow>
+          <FRow icon="">
+            <span style={{fontSize:12,color:V.oSV,width:28,flexShrink:0}}>종료</span>
+            <input type="time" value={te} onChange={e=>setTe(e.target.value)} style={{fontSize:14,color:V.oS,flex:1}}/>
+          </FRow>
+        </>)}
+
+        {/* 메모 */}
+        {!picker&&(
+          <FRow icon="notes" top>
+            <textarea value={mm} onChange={e=>setMm(e.target.value)} placeholder="메모 (선택사항)" rows={2} style={{fontSize:14,color:V.oS}}/>
+          </FRow>
+        )}
+
+        <button onClick={submit} style={{width:'100%',padding:14,borderRadius:14,background:ti.trim()?V.pri:'rgba(0,0,0,.08)',color:ti.trim()?'#fff':V.oSV,fontSize:15,fontWeight:600,marginTop:18,transition:'background .2s,color .2s',letterSpacing:-.1}}>
+          수정 완료
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FRow({icon,children,top}){
+  return(
+    <div style={{display:'flex',alignItems:top?'flex-start':'center',gap:12,padding:'11px 0',borderBottom:`1px solid ${V.ol}`}}>
+      {icon
+        ?<span className="material-symbols-outlined" style={{fontSize:19,color:V.oSV,flexShrink:0,marginTop:top?2:0}}>{icon}</span>
+        :<div style={{width:19,flexShrink:0}}/>
+      }
+      {children}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   ANNIVERSARY TAB
+══════════════════════════════════════ */
+function AnnTab({coupleStart,annList,names}){
+  const days=dSince(coupleStart);
+  const proc=annList.map(a=>{const nd=annDate(a);return{...a,nd,dl:Math.ceil((nd-TODAY)/DMS)};}).sort((a,b)=>a.dl-b.dl);
+  const upc=proc.filter(a=>a.dl>=0);
+  const pst=[...proc.filter(a=>a.dl<0)].reverse();
+
+  return(
+    <div className="scr" style={{flex:1,overflowY:'auto',background:V.bg,padding:'10px 14px 80px'}}>
+      {/* Big counter */}
+      <div style={{background:V.ban,borderRadius:24,padding:'28px 24px',textAlign:'center',marginBottom:20}}>
+        <div style={{fontSize:13,fontWeight:500,color:V.bT,opacity:.65,marginBottom:6,letterSpacing:.5}}>{names.me} ♥ {names.partner}</div>
+        <div style={{fontSize:60,fontWeight:700,color:V.bT,letterSpacing:-3,lineHeight:1}}>{days.toLocaleString()}</div>
+        <div style={{fontSize:16,fontWeight:500,color:V.bT,opacity:.8,marginTop:6}}>일째 함께하고 있어요</div>
+        <div style={{fontSize:11,color:V.bT,opacity:.5,marginTop:8,display:'flex',alignItems:'center',justifyContent:'center',gap:4}}>
+          <span className="material-symbols-outlined" style={{fontSize:13,fontVariationSettings:"'FILL' 1"}}>favorite</span>
+          {coupleStart.getFullYear()}년 {coupleStart.getMonth()+1}월 {coupleStart.getDate()}일부터
+        </div>
+      </div>
+
+      <SecLbl label="다가오는 기념일"/>
+      {upc.map(a=><ACard key={a.id} a={a} past={false}/>)}
+
+      {pst.length>0&&<>
+        <SecLbl label="지난 기념일" mt={20}/>
+        {pst.map(a=><ACard key={a.id} a={a} past={true}/>)}
+      </>}
+
+    </div>
+  );
+}
+
+function SecLbl({label,mt=0}){
+  return<div style={{fontSize:11,fontWeight:700,color:V.oSV,letterSpacing:.9,marginBottom:10,marginTop:mt,textTransform:'uppercase'}}>{label}</div>;
+}
+
+function ACard({a,past}){
+  const dateStr=`${a.nd.getFullYear()}.${String(a.nd.getMonth()+1).padStart(2,'0')}.${String(a.nd.getDate()).padStart(2,'0')}`;
+  return(
+    <div style={{display:'flex',alignItems:'center',gap:12,background:V.surf,borderRadius:16,padding:'13px 14px',marginBottom:9,border:`1px solid ${V.ol}`,opacity:past?.45:1,boxShadow:past?'none':'0 2px 8px rgba(0,0,0,.04)'}}>
+      <div style={{width:46,height:46,borderRadius:14,background:past?V.sC:V.pC,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+        <span className="material-symbols-outlined" style={{fontSize:22,color:past?V.oSV:V.pri,fontVariationSettings:past?"'FILL' 0":"'FILL' 1"}}>event</span>
+      </div>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:14,fontWeight:500,color:V.oS,letterSpacing:-.15,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{a.ti}</div>
+        <div style={{fontSize:11,color:V.oSV,marginTop:2}}>{dateStr}</div>
+      </div>
+      <div style={{flexShrink:0}}>
+        <div style={{fontSize:13,fontWeight:700,color:past?V.oSV:V.pri,textAlign:'right'}}>
+          {past?'완료':a.dl===0?'오늘! 🎉':`D-${a.dl}`}
+        </div>
+        {!past&&a.dl>0&&<div style={{fontSize:10,color:V.oSV,textAlign:'right',marginTop:1}}>
+          {a.dl<30?'곧 다가와요':a.dl<90?'이번 분기':a.dl<180?'올 하반기':'연말'}
+        </div>}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   BUCKET LIST TAB
+══════════════════════════════════════ */
+const BK_CATS=['여행','데이트','문화','기타'];
+
+function BkAddSht({onClose,onAdd,defaultCat}){
+  const [ti,setTi]=useState('');
+  const [cat,setCat]=useState(defaultCat||'데이트');
+  function submit(){
+    if(!ti.trim()) return;
+    onAdd({ti:ti.trim(),done:false,cat});
+  }
+  return(
+    <div className="ovl" onClick={onClose}>
+      <div className="sht" style={{background:V.surf,padding:'12px 20px 44px'}} onClick={e=>e.stopPropagation()}>
+        <div style={{width:38,height:4,borderRadius:2,background:'rgba(0,0,0,.1)',margin:'0 auto 18px'}}/>
+        <div style={{fontSize:17,fontWeight:600,color:V.oS,marginBottom:16,letterSpacing:-.3}}>새 버킷리스트</div>
+
+        <FRow icon="checklist">
+          <input value={ti} onChange={e=>setTi(e.target.value)}
+            onKeyDown={e=>{if(e.key==='Enter') submit();}}
+            placeholder="함께 하고 싶은 것" style={{fontSize:15,color:V.oS,fontWeight:500}} autoFocus/>
+        </FRow>
+
+        <FRow icon="category">
+          <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
+            {BK_CATS.map(c=>(
+              <button key={c} onClick={()=>setCat(c)}
+                style={{padding:'5px 13px',borderRadius:20,
+                  background:cat===c?V.pri:'rgba(0,0,0,.05)',
+                  color:cat===c?'#fff':V.oSV,
+                  fontSize:12,fontWeight:600,transition:'all .15s'}}>
+                {c}
+              </button>
+            ))}
+          </div>
+        </FRow>
+
+        <button onClick={submit}
+          style={{width:'100%',padding:14,borderRadius:14,
+            background:ti.trim()?V.pri:'rgba(0,0,0,.08)',
+            color:ti.trim()?'#fff':V.oSV,
+            fontSize:15,fontWeight:600,marginTop:18,
+            transition:'background .2s,color .2s',letterSpacing:-.1}}>
+          추가하기
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function BkTab({items,onToggle,onAdd}){
+  const [fil,setFil]=useState('전체');
+  const [showAdd,setShowAdd]=useState(false);
+  const done=items.filter(i=>i.done).length;
+  const total=items.length;
+  const allCats=[...new Set(items.map(i=>i.cat))];
+  const cats=['전체',...allCats];
+  const filt=fil==='전체'?items:items.filter(i=>i.cat===fil);
+  const pct=total?Math.round(done/total*100):0;
+
+  return(
+    <div style={{flex:1,overflow:'hidden',position:'relative',display:'flex',flexDirection:'column',background:V.bg}}>
+      <div className="scr" style={{flex:1,overflowY:'auto',padding:'10px 14px 88px'}}>
+        {/* Progress card */}
+        <div style={{background:V.surf,borderRadius:20,padding:'18px 18px 16px',marginBottom:16,border:`1px solid ${V.ol}`,boxShadow:'0 2px 8px rgba(0,0,0,.04)'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+            <div>
+              <div style={{fontSize:15,fontWeight:600,color:V.oS,letterSpacing:-.3}}>함께하고 싶은 것들</div>
+              <div style={{fontSize:11,color:V.oSV,marginTop:3}}>{done===total?'🎉 모두 달성했어요!':done===0?'첫 번째 도전을 완료해보세요!':`${total-done}개 남았어요`}</div>
+            </div>
+            <div style={{textAlign:'right'}}>
+              <div style={{fontSize:22,fontWeight:700,color:V.pri,letterSpacing:-1}}>{done}</div>
+              <div style={{fontSize:11,color:V.oSV}}>/ {total}</div>
+            </div>
+          </div>
+          <div style={{height:8,background:V.sC,borderRadius:4,overflow:'hidden'}}>
+            <div style={{height:'100%',width:`${pct}%`,background:`linear-gradient(90deg,${V.pri},#E57373)`,borderRadius:4,transition:'width .4s cubic-bezier(.34,1.56,.64,1)'}}/>
+          </div>
+          <div style={{fontSize:10,color:V.oSV,marginTop:6,textAlign:'right'}}>{pct}% 완료</div>
+        </div>
+
+        {/* Category filters */}
+        <div style={{display:'flex',gap:8,marginBottom:14,overflowX:'auto',paddingBottom:2}}>
+          {cats.map(c=>(
+            <button key={c} onClick={()=>setFil(c)} style={{padding:'6px 16px',borderRadius:20,background:fil===c?V.pri:V.sC,color:fil===c?'#fff':V.oSV,fontSize:12,fontWeight:500,whiteSpace:'nowrap',flexShrink:0,transition:'all .15s'}}>
+              {c}
+            </button>
+          ))}
+        </div>
+
+        {/* Items */}
+        {filt.map(item=>(
+          <div key={item.id} onClick={()=>onToggle(item.id)}
+            style={{display:'flex',alignItems:'center',gap:12,borderRadius:14,padding:'13px 14px',marginBottom:9,cursor:'pointer',
+              border:`1px solid ${item.done?'transparent':V.ol}`,background:item.done?V.sC:V.surf,transition:'all .2s'}}>
+            <div style={{width:24,height:24,borderRadius:'50%',flexShrink:0,
+              background:item.done?V.pri:'transparent',border:`2px solid ${item.done?V.pri:V.ol}`,
+              display:'flex',alignItems:'center',justifyContent:'center',transition:'all .2s'}}>
+              {item.done&&<span className="material-symbols-outlined" style={{fontSize:14,color:'#fff',fontVariationSettings:"'FILL' 1"}}>check</span>}
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,color:item.done?V.oSV:V.oS,textDecoration:item.done?'line-through':'none',fontWeight:item.done?400:500,transition:'all .2s',letterSpacing:-.1}}>{item.ti}</div>
+              <div style={{fontSize:11,color:V.oSV,marginTop:1}}>{item.cat}</div>
+            </div>
+          </div>
+        ))}
+
+        {/* Add trigger */}
+        <button onClick={()=>setShowAdd(true)}
+          style={{display:'flex',alignItems:'center',gap:10,width:'100%',
+            background:V.surf,borderRadius:14,padding:'12px 14px',
+            border:`1.5px dashed ${V.ol}`,marginTop:4,cursor:'pointer'}}>
+          <span className="material-symbols-outlined" style={{fontSize:20,color:V.oSV}}>add</span>
+          <span style={{fontSize:14,color:V.oSV}}>새 버킷리스트 추가…</span>
+        </button>
+      </div>
+
+      {/* FAB */}
+      <button onClick={()=>setShowAdd(true)}
+        style={{position:'absolute',bottom:16,right:18,width:52,height:52,borderRadius:'50%',
+          background:V.pri,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',
+          boxShadow:'0 4px 16px rgba(212,96,122,.45)',zIndex:10}}>
+        <span className="material-symbols-outlined" style={{fontSize:26}}>add</span>
+      </button>
+
+      {showAdd&&<BkAddSht
+        defaultCat={fil==='전체'?'데이트':fil}
+        onClose={()=>setShowAdd(false)}
+        onAdd={item=>{onAdd(item);setShowAdd(false);}}
+      />}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   DRUM-ROLL DATE PICKER (생일 설정용)
+══════════════════════════════════════ */
+function ScrollCol({items,selected,onSelect,label}){
+  const IH=40;
+  const ref=useRef(null);
+  const skip=useRef(false);
+  const timer=useRef(null);
+
+  useEffect(()=>{
+    if(!ref.current) return;
+    let idx=items.indexOf(selected);
+    if(idx<0) idx=Math.max(0,items.length-1);
+    skip.current=true;
+    ref.current.scrollTop=idx*IH;
+    requestAnimationFrame(()=>{skip.current=false;});
+  },[selected,items]);
+
+  function onScroll(){
+    if(skip.current) return;
+    clearTimeout(timer.current);
+    timer.current=setTimeout(()=>{
+      if(!ref.current) return;
+      const idx=Math.round(ref.current.scrollTop/IH);
+      const c=Math.max(0,Math.min(idx,items.length-1));
+      if(items[c]!==selected) onSelect(items[c]);
+    },150);
+  }
+
+  return(
+    <div style={{flex:1,position:'relative',overflow:'hidden',userSelect:'none'}}>
+      {/* 선택 구분선 */}
+      <div style={{position:'absolute',top:'50%',left:4,right:4,transform:'translateY(-50%)',height:IH,
+        borderTop:`1px solid ${V.ol}`,borderBottom:`1px solid ${V.ol}`,pointerEvents:'none',zIndex:3}}/>
+      {/* 위 페이드 */}
+      <div style={{position:'absolute',top:0,left:0,right:0,height:IH*2,
+        background:'linear-gradient(to bottom,rgba(255,255,255,.97) 30%,rgba(255,255,255,0))',
+        pointerEvents:'none',zIndex:2}}/>
+      {/* 아래 페이드 */}
+      <div style={{position:'absolute',bottom:0,left:0,right:0,height:IH*2,
+        background:'linear-gradient(to top,rgba(255,255,255,.97) 30%,rgba(255,255,255,0))',
+        pointerEvents:'none',zIndex:2}}/>
+      <div ref={ref} className="drum-col" onScroll={onScroll}
+        style={{height:IH*5,overflowY:'scroll',scrollSnapType:'y mandatory',
+          WebkitOverflowScrolling:'touch',paddingTop:IH*2,paddingBottom:IH*2,
+          msOverflowStyle:'none',scrollbarWidth:'none'}}>
+        {items.map(v=>(
+          <div key={v} style={{height:IH,display:'flex',alignItems:'center',justifyContent:'center',
+            scrollSnapAlign:'center',fontSize:16,letterSpacing:-.3,
+            fontWeight:v===selected?700:400,color:v===selected?V.pri:V.oS,transition:'color .15s'}}>
+            {label==='년'?v:String(v).padStart(2,'0')}{label}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DrumPicker({value,onSelect}){
+  const curY=TODAY.getFullYear();
+  const base=value?value.split('-').map(Number):[curY-25,1,1];
+  const [y,setY]=useState(base[0]);
+  const [m,setM]=useState(base[1]);
+  const [d,setD]=useState(base[2]);
+
+  const years=Array.from({length:curY-1939},(_,i)=>1940+i);
+  const months=Array.from({length:12},(_,i)=>i+1);
+  const dim=new Date(y,m,0).getDate();
+  const days=Array.from({length:dim},(_,i)=>i+1);
+
+  useEffect(()=>{
+    const mx=new Date(y,m,0).getDate();
+    if(d>mx) setD(mx);
+  },[y,m]);
+
+  function confirm(){
+    const mx=new Date(y,m,0).getDate();
+    const sd=Math.min(d,mx);
+    onSelect(`${y}-${String(m).padStart(2,'0')}-${String(sd).padStart(2,'0')}`);
+  }
+
+  return(
+    <div>
+      <div style={{display:'flex',height:200,borderRadius:12,overflow:'hidden'}}>
+        <ScrollCol items={years} selected={y} onSelect={setY} label="년"/>
+        <ScrollCol items={months} selected={m} onSelect={setM} label="월"/>
+        <ScrollCol items={days} selected={d} onSelect={setD} label="일"/>
+      </div>
+      <button onClick={confirm}
+        style={{width:'100%',marginTop:12,padding:'13px',borderRadius:14,
+          background:V.pri,color:'#fff',fontSize:15,fontWeight:600,letterSpacing:-.2}}>
+        확인
+      </button>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   PROFILE / MORE TAB
+══════════════════════════════════════ */
+/* 더보기 탭 설정 항목별 순환 옵션 */
+
+function ProfTab({names:initNames,setNames,coupleStart,setCoupleStart,birthdays:initBdays,setBirthdays}){
+  const days=coupleStart?dSince(coupleStart):0;
+  const lnRef=useRef(initNames);
+  const [ln,setLn]=useState(initNames);
+  const lbRef=useRef(initBdays);
+  const [lb,setLb]=useState(initBdays);
+
+  const [editingName,setEditingName]=useState(null);
+  const [activePicker,setActivePicker]=useState(null);
+  const meRef=useRef(null);
+  const partnerRef=useRef(null);
+
+  function togglePicker(key){setActivePicker(p=>p===key?null:key);}
+  function fmtDate(s){if(!s)return'미설정';const[y,m,d]=s.split('-');return`${y}.${m}.${d}`;}
+  const csStr=coupleStart?d2s(coupleStart):'';
+
+  return(
+    <div className="scr" style={{flex:1,overflowY:'auto',background:V.bg,padding:'10px 14px 80px'}}>
+      {/* Couple card */}
+      <div style={{background:V.ban,borderRadius:24,padding:'22px 20px',textAlign:'center',marginBottom:20}}>
+        <div style={{display:'flex',justifyContent:'center',alignItems:'center',marginBottom:14}}>
+          <div style={{width:64,height:64,borderRadius:'50%',background:U.me.color,display:'flex',alignItems:'center',justifyContent:'center',border:'3px solid rgba(255,255,255,.8)',fontSize:24,color:'#fff',fontWeight:700,boxShadow:'0 4px 12px rgba(0,0,0,.15)',zIndex:2}}>{(ln.me||'?')[0]}</div>
+          <div style={{width:36,height:36,borderRadius:'50%',background:'rgba(255,255,255,.6)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,marginLeft:-10,marginRight:-10,zIndex:3,boxShadow:'0 2px 8px rgba(0,0,0,.1)'}}>❤️</div>
+          <div style={{width:64,height:64,borderRadius:'50%',background:U.partner.color,display:'flex',alignItems:'center',justifyContent:'center',border:'3px solid rgba(255,255,255,.8)',fontSize:24,color:'#fff',fontWeight:700,boxShadow:'0 4px 12px rgba(0,0,0,.15)',zIndex:2}}>{(ln.partner||'?')[0]}</div>
+        </div>
+        <div style={{fontSize:17,fontWeight:600,color:V.bT,letterSpacing:-.3}}>{ln.me} &amp; {ln.partner}</div>
+        <div style={{fontSize:12,color:V.bT,opacity:.65,marginTop:5}}>
+          {coupleStart
+            ?`${coupleStart.getFullYear()}년 ${coupleStart.getMonth()+1}월 ${coupleStart.getDate()}일부터 ${days.toLocaleString()}일째 💕`
+            :'사랑을 시작한 날을 설정해보세요 💕'
+          }
+        </div>
+      </div>
+
+      {/* 우리의 시작 */}
+      <div style={{marginBottom:activePicker==='couple_start'?8:20}}>
+        <SecLbl label="우리의 시작"/>
+        <div style={{background:V.surf,borderRadius:16,overflow:'hidden',border:`1px solid ${V.ol}`}}>
+          <div onClick={()=>togglePicker('couple_start')}
+            style={{display:'flex',alignItems:'center',gap:12,padding:'13px 16px',cursor:'pointer'}}>
+            <span className="material-symbols-outlined" style={{fontSize:20,color:V.pri,flexShrink:0}}>favorite</span>
+            <span style={{flex:1,fontSize:14,color:V.oS}}>사랑을 시작한 날</span>
+            <span style={{fontSize:13,color:csStr?V.pri:V.oSV,fontWeight:csStr?500:400}}>{csStr?fmtDate(csStr):'미설정'}</span>
+            <span className="material-symbols-outlined" style={{fontSize:16,color:V.ol}}>chevron_right</span>
+          </div>
+        </div>
+      </div>
+      {activePicker==='couple_start'&&(
+        <div style={{background:V.surf,borderRadius:16,border:`1px solid ${V.ol}`,padding:'12px',marginBottom:20,marginTop:-8}}>
+          <CalPicker value={csStr||TODAY_STR} onSelect={v=>{const[y,m,d]=v.split('-').map(Number);setCoupleStart(new Date(y,m-1,d));setActivePicker(null);}}/>
+        </div>
+      )}
+
+      {/* 내 정보 */}
+      <div style={{marginBottom:activePicker==='bday_me'?8:20}}>
+        <SecLbl label="내 정보"/>
+        <div style={{background:V.surf,borderRadius:16,overflow:'hidden',border:`1px solid ${V.ol}`}}>
+          <div onClick={()=>{setEditingName('me');meRef.current?.focus();}}
+            style={{display:'flex',alignItems:'center',gap:12,padding:'13px 16px',borderBottom:`1px solid ${V.ol}`,cursor:'pointer'}}>
+            <span className="material-symbols-outlined" style={{fontSize:20,color:V.oSV,flexShrink:0}}>person</span>
+            <span style={{flex:1,fontSize:14,color:V.oS}}>내 이름</span>
+            <input ref={meRef} value={ln.me}
+              onChange={e=>{const n={...lnRef.current,me:e.target.value};lnRef.current=n;setLn(n);}}
+              onFocus={()=>setEditingName('me')}
+              onBlur={()=>{setEditingName(null);setNames(lnRef.current);}}
+              onKeyDown={e=>e.key==='Enter'&&meRef.current?.blur()}
+              onClick={e=>e.stopPropagation()}
+              style={{fontSize:13,fontWeight:600,textAlign:'right',width:80,outline:'none',background:'transparent',
+                color:editingName==='me'?V.pri:V.oSV,
+                borderBottom:editingName==='me'?`1px solid ${V.pri}`:'none',
+                caretColor:V.pri}}/>
+            <span className="material-symbols-outlined" style={{fontSize:16,color:V.ol}}>chevron_right</span>
+          </div>
+          <div onClick={()=>togglePicker('bday_me')}
+            style={{display:'flex',alignItems:'center',gap:12,padding:'13px 16px',cursor:'pointer'}}>
+            <span className="material-symbols-outlined" style={{fontSize:20,color:V.oSV,flexShrink:0}}>cake</span>
+            <span style={{flex:1,fontSize:14,color:V.oS}}>생일</span>
+            <span style={{fontSize:13,color:lb.me?V.pri:V.oSV,fontWeight:lb.me?500:400}}>{fmtDate(lb.me)}</span>
+            <span className="material-symbols-outlined" style={{fontSize:16,color:V.ol}}>chevron_right</span>
+          </div>
+        </div>
+      </div>
+      {activePicker==='bday_me'&&(
+        <div style={{background:V.surf,borderRadius:16,border:`1px solid ${V.ol}`,padding:'14px 12px 12px',marginBottom:20,marginTop:-8}}>
+          <DrumPicker value={lb.me} onSelect={v=>{const nb={...lbRef.current,me:v};lbRef.current=nb;setLb(nb);setBirthdays(nb);setActivePicker(null);}}/>
+        </div>
+      )}
+
+      {/* 상대방 정보 */}
+      <div style={{marginBottom:activePicker==='bday_partner'?8:20}}>
+        <SecLbl label="상대방 정보"/>
+        <div style={{background:V.surf,borderRadius:16,overflow:'hidden',border:`1px solid ${V.ol}`}}>
+          <div onClick={()=>{setEditingName('partner');partnerRef.current?.focus();}}
+            style={{display:'flex',alignItems:'center',gap:12,padding:'13px 16px',borderBottom:`1px solid ${V.ol}`,cursor:'pointer'}}>
+            <span className="material-symbols-outlined" style={{fontSize:20,color:V.oSV,flexShrink:0}}>favorite</span>
+            <span style={{flex:1,fontSize:14,color:V.oS}}>이름</span>
+            <input ref={partnerRef} value={ln.partner}
+              onChange={e=>{const n={...lnRef.current,partner:e.target.value};lnRef.current=n;setLn(n);}}
+              onFocus={()=>setEditingName('partner')}
+              onBlur={()=>{setEditingName(null);setNames(lnRef.current);}}
+              onKeyDown={e=>e.key==='Enter'&&partnerRef.current?.blur()}
+              onClick={e=>e.stopPropagation()}
+              style={{fontSize:13,fontWeight:600,textAlign:'right',width:80,outline:'none',background:'transparent',
+                color:editingName==='partner'?V.pri:V.oSV,
+                borderBottom:editingName==='partner'?`1px solid ${V.pri}`:'none',
+                caretColor:V.pri}}/>
+            <span className="material-symbols-outlined" style={{fontSize:16,color:V.ol}}>chevron_right</span>
+          </div>
+          <div onClick={()=>togglePicker('bday_partner')}
+            style={{display:'flex',alignItems:'center',gap:12,padding:'13px 16px',cursor:'pointer'}}>
+            <span className="material-symbols-outlined" style={{fontSize:20,color:V.oSV,flexShrink:0}}>cake</span>
+            <span style={{flex:1,fontSize:14,color:V.oS}}>생일</span>
+            <span style={{fontSize:13,color:lb.partner?V.pri:V.oSV,fontWeight:lb.partner?500:400}}>{fmtDate(lb.partner)}</span>
+            <span className="material-symbols-outlined" style={{fontSize:16,color:V.ol}}>chevron_right</span>
+          </div>
+        </div>
+      </div>
+      {activePicker==='bday_partner'&&(
+        <div style={{background:V.surf,borderRadius:16,border:`1px solid ${V.ol}`,padding:'14px 12px 12px',marginBottom:20,marginTop:-8}}>
+          <DrumPicker value={lb.partner} onSelect={v=>{const nb={...lbRef.current,partner:v};lbRef.current=nb;setLb(nb);setBirthdays(nb);setActivePicker(null);}}/>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   BOTTOM TAB BAR
+══════════════════════════════════════ */
+function BTBar({active,setActive}){
+  const tabs=[
+    {id:'calendar',    ic:'calendar_month',lb:'캘린더'},
+    {id:'anniversary', ic:'favorite',      lb:'기념일'},
+    {id:'bucket',      ic:'checklist',     lb:'버킷리스트'},
+    {id:'profile',     ic:'person',        lb:'더보기'},
+  ];
+  return(
+    <div style={{height:83,paddingBottom:28,paddingTop:8,background:V.surf,borderTop:`1px solid ${V.ol}`,display:'flex',justifyContent:'space-around',alignItems:'flex-start',flexShrink:0,zIndex:20}}>
+      {tabs.map(t=>{
+        const on=t.id===active;
+        return(
+          <button key={t.id} onClick={()=>setActive(t.id)} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3,padding:'2px 6px',minWidth:0}}>
+            <div style={{width:62,height:32,borderRadius:16,background:on?V.pC:'transparent',display:'flex',alignItems:'center',justifyContent:'center',transition:'background .2s'}}>
+              <span className="material-symbols-outlined" style={{fontSize:22,color:on?V.tOn:V.tOff,transition:'color .2s',fontVariationSettings:on?"'FILL' 1, 'wght' 600":"'FILL' 0, 'wght' 400"}}>{t.ic}</span>
+            </div>
+            <span style={{fontSize:9.5,color:on?V.tOn:V.tOff,fontWeight:on?600:400,transition:'color .2s',letterSpacing:.15,whiteSpace:'nowrap'}}>{t.lb}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   LOADING SCREEN
+══════════════════════════════════════ */
+function LoadingScreen(){
+  return(
+    <div style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:V.bg,gap:16}}>
+      <div style={{width:60,height:60,borderRadius:'50%',background:V.pC,display:'flex',alignItems:'center',justifyContent:'center'}}>
+        <span className="material-symbols-outlined" style={{fontSize:30,color:V.pri,fontVariationSettings:"'FILL' 1"}}>favorite</span>
+      </div>
+      <div style={{fontSize:15,color:V.oSV,fontWeight:500}}>연결 중...</div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   PAIRING SCREEN
+══════════════════════════════════════ */
+function PairingScreen({myUid,onPaired}){
+  const [mode,setMode]=useState('home'); // 'home'|'create'|'join'
+  const [myCode,setMyCode]=useState('');
+  const [joinCode,setJoinCode]=useState('');
+  const [err,setErr]=useState('');
+  const [busy,setBusy]=useState(false);
+
+  /* 상대방이 참여하면 자동 전환 */
+  useEffect(()=>{
+    if(mode!=='create'||!myCode) return;
+    const unsub=db.collection('couples').doc(myCode).onSnapshot(snap=>{
+      if(snap.exists&&snap.data().uid2) onPaired(myCode);
+    });
+    return()=>unsub();
+  },[mode,myCode]);
+
+  async function createCouple(){
+    setBusy(true);setErr('');
+    try{
+      const code=Math.random().toString(36).substring(2,8).toUpperCase();
+      await db.collection('couples').doc(code).set({
+        uid1:myUid, uid2:null,
+        names:{[myUid]:'나'},
+        birthdays:{[myUid]:''},
+        coupleStart:d2s(TODAY),
+        createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      localStorage.setItem('coupleId',code);
+      setMyCode(code);setMode('create');
+    }catch(e){setErr('생성 실패. 다시 시도해주세요.');}
+    setBusy(false);
+  }
+
+  async function joinCouple(){
+    const code=joinCode.trim().toUpperCase();
+    if(code.length<6){setErr('6자리 코드를 입력해주세요.');return;}
+    setBusy(true);setErr('');
+    try{
+      const ref=db.collection('couples').doc(code);
+      const snap=await ref.get();
+      if(!snap.exists){setErr('코드를 찾을 수 없어요.');setBusy(false);return;}
+      const d=snap.data();
+      if(d.uid2){setErr('이미 연결된 커플이에요.');setBusy(false);return;}
+      if(d.uid1===myUid){setErr('내 코드예요! 상대방 코드를 입력하세요.');setBusy(false);return;}
+      await ref.update({uid2:myUid,[`names.${myUid}`]:'상대방',[`birthdays.${myUid}`]:''});
+      localStorage.setItem('coupleId',code);
+      onPaired(code);
+    }catch(e){setErr('연결 실패. 다시 시도해주세요.');}
+    setBusy(false);
+  }
+
+  if(mode==='create'){
+    return(
+      <div style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:V.bg,padding:'0 32px',gap:18}}>
+        <div style={{fontSize:44}}>🎉</div>
+        <div style={{fontSize:20,fontWeight:700,color:V.oS,letterSpacing:-.5,textAlign:'center'}}>초대 코드 생성 완료</div>
+        <div style={{fontSize:13,color:V.oSV,textAlign:'center',lineHeight:1.7}}>아래 코드를 상대방에게 공유하세요.<br/>상대방이 입력하면 자동으로 연결돼요.</div>
+        <div style={{background:V.pC,borderRadius:20,padding:'22px 36px',border:`2px solid ${V.pri}`,marginTop:4}}>
+          <div style={{fontSize:34,fontWeight:700,color:V.pri,letterSpacing:10,textAlign:'center',fontFamily:'monospace'}}>{myCode}</div>
+        </div>
+        <div style={{fontSize:11,color:V.oSV,marginTop:4}}>상대방 연결 대기 중...</div>
+        <button onClick={()=>onPaired(myCode)}
+          style={{marginTop:6,padding:'13px 32px',borderRadius:14,background:V.surf,color:V.oSV,fontSize:13,border:`1px solid ${V.ol}`}}>
+          연결 전에 먼저 시작하기
+        </button>
+      </div>
+    );
+  }
+
+  if(mode==='join'){
+    return(
+      <div style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:V.bg,padding:'0 32px',gap:16,position:'relative'}}>
+        <button onClick={()=>{setMode('home');setErr('');}} style={{position:'absolute',top:56,left:16,padding:8,color:V.oSV,display:'flex',alignItems:'center'}}>
+          <span className="material-symbols-outlined" style={{fontSize:22}}>arrow_back</span>
+        </button>
+        <div style={{fontSize:40}}>🔗</div>
+        <div style={{fontSize:20,fontWeight:700,color:V.oS,letterSpacing:-.5}}>코드 입력</div>
+        <div style={{fontSize:13,color:V.oSV,textAlign:'center'}}>상대방의 초대 코드 6자리를 입력하세요</div>
+        <input value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase().slice(0,6))}
+          placeholder="ABC123" autoFocus
+          style={{width:'100%',textAlign:'center',fontSize:30,fontWeight:700,letterSpacing:8,
+            padding:'16px',borderRadius:14,border:`2px solid ${joinCode.length===6?V.pri:V.ol}`,
+            background:V.surf,color:V.oS,fontFamily:'monospace',outline:'none',caretColor:V.pri,
+            transition:'border-color .2s'}}/>
+        {err&&<div style={{fontSize:12,color:'#D1213A',textAlign:'center'}}>{err}</div>}
+        <button onClick={joinCouple} disabled={busy||joinCode.length<6}
+          style={{width:'100%',padding:15,borderRadius:14,background:joinCode.length===6?V.pri:'rgba(0,0,0,.08)',
+            color:joinCode.length===6?'#fff':V.oSV,fontSize:15,fontWeight:600,
+            opacity:busy?.6:1,transition:'all .2s'}}>
+          {busy?'연결 중...':'커플 연결하기'}
+        </button>
+      </div>
+    );
+  }
+
+  return(
+    <div style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:V.bg,padding:'0 32px',gap:18}}>
+      <div style={{fontSize:56}}>💑</div>
+      <div style={{fontSize:22,fontWeight:700,color:V.oS,letterSpacing:-.5,textAlign:'center'}}>우리 캘린더 시작</div>
+      <div style={{fontSize:14,color:V.oSV,textAlign:'center',lineHeight:1.75}}>초대 코드로 상대방과 연결하면<br/>일정을 실시간으로 함께 공유해요</div>
+      <div style={{width:'100%',display:'flex',flexDirection:'column',gap:12,marginTop:8}}>
+        <button onClick={createCouple} disabled={busy}
+          style={{width:'100%',padding:16,borderRadius:16,background:V.pri,color:'#fff',
+            fontSize:15,fontWeight:600,boxShadow:'0 4px 16px rgba(212,96,122,.3)',opacity:busy?.6:1}}>
+          {busy?'생성 중...':'초대 코드 만들기'}
+        </button>
+        <button onClick={()=>{setMode('join');setErr('');}}
+          style={{width:'100%',padding:16,borderRadius:16,background:V.surf,color:V.pri,
+            fontSize:15,fontWeight:600,border:`1.5px solid ${V.pri}`}}>
+          코드 입력하기
+        </button>
+      </div>
+      {err&&<div style={{fontSize:12,color:'#D1213A'}}>{err}</div>}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   ROOT APP
+══════════════════════════════════════ */
+function App(){
+  const [appState,setAppState]=useState('loading'); // 'loading'|'pairing'|'ready'
+  const [tab,setTab]=useState('calendar');
+  const [myUid,setMyUid]=useState(null);
+  const [coupleId,setCoupleId]=useState(null);
+  const [coupleDoc,setCoupleDoc]=useState(null);
+  const [evs,setEvs]=useState([]);
+  const [bkItems,setBkItems]=useState([]);
+
+  /* ── Auth ── */
+  useEffect(()=>{
+    const unsub=auth.onAuthStateChanged(async user=>{
+      if(user){
+        setMyUid(user.uid);
+        const saved=localStorage.getItem('coupleId');
+        if(saved){
+          try{
+            const snap=await db.collection('couples').doc(saved).get();
+            if(snap.exists){
+              const d=snap.data();
+              if(d.uid1===user.uid||d.uid2===user.uid){
+                setCoupleId(saved);setAppState('ready');return;
+              }
+            }
+          }catch(e){}
+          localStorage.removeItem('coupleId');
+        }
+        setAppState('pairing');
+      }else{
+        auth.signInAnonymously().catch(()=>setAppState('pairing'));
+      }
+    });
+    return()=>unsub();
+  },[]);
+
+  /* ── Firestore 실시간 리스너 ── */
+  useEffect(()=>{
+    if(!coupleId) return;
+    const c=db.collection('couples').doc(coupleId);
+    const u1=c.onSnapshot(snap=>{if(snap.exists)setCoupleDoc(snap.data());});
+    const u2=c.collection('events').onSnapshot(snap=>{
+      setEvs(snap.docs.map(d=>({id:d.id,...d.data()})));
+    });
+    const u3=c.collection('buckets').orderBy('createdAt').onSnapshot(snap=>{
+      setBkItems(snap.docs.map(d=>({id:d.id,...d.data()})));
+    });
+    return()=>{u1();u2();u3();};
+  },[coupleId]);
+
+  /* ── Firestore doc 참조 헬퍼 ── */
+  function cRef(){return db.collection('couples').doc(coupleId);}
+
+  /* ── 파생 상태 ── */
+  const partnerUid=coupleDoc
+    ?(coupleDoc.uid1===myUid?coupleDoc.uid2:coupleDoc.uid1)
+    :null;
+  const names={
+    me:      coupleDoc?.names?.[myUid]||'나',
+    partner: partnerUid?coupleDoc?.names?.[partnerUid]||'상대방':'상대방',
+  };
+  const birthdays={
+    me:      coupleDoc?.birthdays?.[myUid]||'',
+    partner: partnerUid?coupleDoc?.birthdays?.[partnerUid]||'':'',
+  };
+  const coupleStart=coupleDoc?.coupleStart
+    ?(()=>{const[y,m,d]=coupleDoc.coupleStart.split('-').map(Number);return new Date(y,m-1,d);})()
+    :TODAY;
+
+  /* uid ↔ role 변환 */
+  function toRole(u){
+    if(u==='both') return 'both';
+    return u===myUid?'me':'partner';
+  }
+  const evsMapped=evs.map(ev=>({...ev,u:toRole(ev.u)}));
+  const annList=buildAnnList(coupleStart,names,birthdays);
+
+  /* ── 이벤트 쓰기 ── */
+  function addEv(ev){
+    const uid=ev.u==='both'?'both':ev.u==='me'?myUid:(partnerUid||myUid);
+    return cRef().collection('events').add({
+      ...ev,u:uid,createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+  function delEv(id){return cRef().collection('events').doc(id).delete();}
+  function updateEv(ev){
+    const{id,...data}=ev;
+    const uid=data.u==='both'?'both':data.u==='me'?myUid:(partnerUid||myUid);
+    return cRef().collection('events').doc(id).set({...data,u:uid});
+  }
+
+  /* ── 버킷리스트 쓰기 ── */
+  function addBkItem(item){
+    return cRef().collection('buckets').add({
+      ...item,createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+  function toggleBkItem(id){
+    const item=bkItems.find(i=>i.id===id);
+    if(!item) return;
+    return cRef().collection('buckets').doc(id).update({done:!item.done});
+  }
+
+  /* ── 설정 저장 ── */
+  function saveNames(n){
+    const upd={[`names.${myUid}`]:n.me};
+    if(partnerUid) upd[`names.${partnerUid}`]=n.partner;
+    return cRef().update(upd);
+  }
+  function saveCoupleStart(dt){return cRef().update({coupleStart:d2s(dt)});}
+  function saveBirthdays(b){
+    const upd={[`birthdays.${myUid}`]:b.me};
+    if(partnerUid) upd[`birthdays.${partnerUid}`]=b.partner;
+    return cRef().update(upd);
+  }
+
+  function handlePaired(id){setCoupleId(id);setAppState('ready');}
+
+  if(appState==='loading') return <LoadingScreen/>;
+  if(appState==='pairing') return <PairingScreen myUid={myUid} onPaired={handlePaired}/>;
+
+  return(
+    <div style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',background:V.bg,fontFamily:"'Roboto',sans-serif",position:'relative'}}>
+      <SBar/>
+      <AHdr names={names}/>
+      <div style={{flex:1,overflow:'hidden',position:'relative',display:'flex',flexDirection:'column'}}>
+        {tab==='calendar'    &&<CalTab evs={evsMapped} addEv={addEv} delEv={delEv} updateEv={updateEv} coupleStart={coupleStart} annList={annList} names={names}/>}
+        {tab==='anniversary' &&<AnnTab coupleStart={coupleStart} annList={annList} names={names}/>}
+        {tab==='bucket'      &&<BkTab items={bkItems} onToggle={toggleBkItem} onAdd={addBkItem}/>}
+        {tab==='profile'     &&<ProfTab names={names} setNames={saveNames} coupleStart={coupleStart} setCoupleStart={saveCoupleStart} birthdays={birthdays} setBirthdays={saveBirthdays}/>}
+      </div>
+      <BTBar active={tab} setActive={setTab}/>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('app-mount')).render(<App/>);
+</script>
+
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js'));
+}
+</script>
+</body>
+</html>
