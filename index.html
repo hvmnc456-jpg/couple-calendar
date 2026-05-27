@@ -1249,38 +1249,55 @@ function PairingScreen({myUid,onPaired}){
     return()=>unsub();
   },[mode,myCode]);
 
+  /* ── Step 3: 안전한 6자리 코드 생성 (0,1,I,O 제외로 혼동 방지) ── */
+  function generateCode(){
+    const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const arr=new Uint8Array(6);
+    crypto.getRandomValues(arr);
+    return Array.from(arr,b=>chars[b%chars.length]).join('');
+  }
+
+  /* ── Step 2+4: 코드 생성 + 서버 반영 확인 ── */
   async function createCouple(){
     setBusy(true);setErr('');
     try{
-      const code=Math.random().toString(36).substring(2,8).toUpperCase();
-      await db.collection('couples').doc(code).set({
+      const code=generateCode();
+      const ref=db.collection('couples').doc(code);
+      await ref.set({
         uid1:myUid, uid2:null,
         names:{[myUid]:'나'},
         birthdays:{[myUid]:''},
         coupleStart:d2s(TODAY),
         createdAt:firebase.firestore.FieldValue.serverTimestamp(),
       });
+      /* Step 4: 서버에 실제로 저장됐는지 확인 (캐시 우선 방지) */
+      const verify=await ref.get({source:'server'});
+      if(!verify.exists) throw new Error('서버 저장 실패');
       localStorage.setItem('coupleId',code);
       setMyCode(code);setMode('create');
-    }catch(e){setErr('생성 실패. 다시 시도해주세요.');}
+    }catch(e){setErr('생성 실패. 네트워크를 확인 후 다시 시도해주세요.');}
     setBusy(false);
   }
 
+  /* ── Step 2: 코드 입력 → 반드시 서버에서 조회 (캐시 우선 방지) ── */
   async function joinCouple(){
     const code=joinCode.trim().toUpperCase();
     if(code.length<6){setErr('6자리 코드를 입력해주세요.');return;}
     setBusy(true);setErr('');
     try{
       const ref=db.collection('couples').doc(code);
-      const snap=await ref.get();
-      if(!snap.exists){setErr('코드를 찾을 수 없어요.');setBusy(false);return;}
+      const snap=await ref.get({source:'server'});
+      if(!snap.exists){setErr('코드를 찾을 수 없어요. 코드를 다시 확인해주세요.');setBusy(false);return;}
       const d=snap.data();
       if(d.uid2){setErr('이미 연결된 커플이에요.');setBusy(false);return;}
       if(d.uid1===myUid){setErr('내 코드예요! 상대방 코드를 입력하세요.');setBusy(false);return;}
       await ref.update({uid2:myUid,[`names.${myUid}`]:'상대방',[`birthdays.${myUid}`]:''});
       localStorage.setItem('coupleId',code);
       onPaired(code);
-    }catch(e){setErr('연결 실패. 다시 시도해주세요.');}
+    }catch(e){
+      if(e.code==='unavailable'){setErr('네트워크 연결을 확인해주세요.');}
+      else{setErr('연결 실패. 다시 시도해주세요.');}
+    }
     setBusy(false);
   }
 
