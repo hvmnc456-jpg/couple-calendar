@@ -1215,7 +1215,7 @@ function ConnectSection({coupleId,myUid,onSwitchCouple}){
 ══════════════════════════════════════ */
 /* 더보기 탭 설정 항목별 순환 옵션 */
 
-function ProfTab({names:initNames,setNames,coupleStart,setCoupleStart,birthdays:initBdays,setBirthdays,partnerUid,coupleId,myUid,onSwitchCouple,myGender,partnerGender,saveGender}){
+function ProfTab({names:initNames,setNames,coupleStart,setCoupleStart,birthdays:initBdays,setBirthdays,partnerUid,coupleId,myUid,onSwitchCouple,myGender,partnerGender,saveGender,onReset}){
   const days=coupleStart?dSince(coupleStart):0;
   const lnRef=useRef(initNames);
   const [ln,setLn]=useState(initNames);
@@ -1224,6 +1224,7 @@ function ProfTab({names:initNames,setNames,coupleStart,setCoupleStart,birthdays:
 
   const [editingName,setEditingName]=useState(null);
   const [activePicker,setActivePicker]=useState(null);
+  const [showResetConfirm,setShowResetConfirm]=useState(false);
   const meRef=useRef(null);
   const partnerRef=useRef(null);
 
@@ -1232,7 +1233,8 @@ function ProfTab({names:initNames,setNames,coupleStart,setCoupleStart,birthdays:
   const csStr=coupleStart?d2s(coupleStart):'';
 
   return(
-    <div className="scr" style={{flex:1,overflowY:'auto',background:V.bg,padding:'10px 14px 80px'}}>
+    <div style={{flex:1,position:'relative',overflow:'hidden',background:V.bg}}>
+    <div className="scr" style={{height:'100%',overflowY:'auto',padding:'10px 14px 100px'}}>
       {/* Couple card */}
       <div style={{background:V.ban,borderRadius:24,padding:'22px 20px',textAlign:'center',marginBottom:20}}>
         {(()=>{
@@ -1346,7 +1348,53 @@ function ProfTab({names:initNames,setNames,coupleStart,setCoupleStart,birthdays:
         <div style={{fontSize:11,color:V.oSV,marginTop:5,textAlign:'center',opacity:.6}}>상대방이 직접 수정할 수 있어요</div>
       </div>
 
-    </div>
+      {/* 초기화 버튼 */}
+      <div style={{marginTop:28,marginBottom:4}}>
+        <button onClick={()=>setShowResetConfirm(true)}
+          style={{width:'100%',padding:13,borderRadius:14,
+            background:'rgba(209,33,58,.07)',color:'#D1213A',
+            fontSize:14,fontWeight:600,border:'1px solid rgba(209,33,58,.18)',
+            letterSpacing:-.1,cursor:'pointer'}}>
+          초기화
+        </button>
+      </div>
+
+    </div>{/* scr end */}
+
+    {/* 초기화 확인 다이얼로그 */}
+    {showResetConfirm&&(
+      <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.55)',zIndex:200,
+        display:'flex',alignItems:'center',justifyContent:'center',padding:'0 28px',
+        animation:'fdi .2s ease'}}>
+        <div style={{background:V.surf,borderRadius:24,padding:'28px 24px',width:'100%',
+          boxShadow:'0 20px 60px rgba(0,0,0,.35)'}}>
+          <div style={{textAlign:'center',marginBottom:10}}>
+            <span className="material-symbols-outlined" style={{fontSize:38,color:'#D1213A',fontVariationSettings:"'FILL' 1"}}>warning</span>
+          </div>
+          <div style={{fontSize:18,fontWeight:700,color:V.oS,textAlign:'center',marginBottom:10,letterSpacing:-.3}}>
+            초기화 하시겠습니까?
+          </div>
+          <div style={{fontSize:13,color:V.oSV,textAlign:'center',lineHeight:1.8,marginBottom:24}}>
+            모든 일정·버킷리스트·기념일 데이터가<br/>삭제되고 상대방과의 연결이 해지됩니다.<br/>
+            <span style={{color:'#D1213A',fontWeight:600}}>이 작업은 되돌릴 수 없어요.</span>
+          </div>
+          <div style={{display:'flex',gap:10}}>
+            <button onClick={()=>setShowResetConfirm(false)}
+              style={{flex:1,padding:14,borderRadius:14,background:V.sC,
+                color:V.oSV,fontSize:15,fontWeight:600,border:`1px solid ${V.ol}`,cursor:'pointer'}}>
+              NO
+            </button>
+            <button onClick={()=>{setShowResetConfirm(false);onReset();}}
+              style={{flex:1,padding:14,borderRadius:14,background:'#D1213A',
+                color:'#fff',fontSize:15,fontWeight:600,cursor:'pointer',
+                boxShadow:'0 4px 12px rgba(209,33,58,.35)'}}>
+              YES
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </div>{/* wrapper end */}
   );
 }
 
@@ -1670,6 +1718,14 @@ function App(){
 
   function handlePaired(id){setCoupleId(id);setAppState('ready');}
 
+  /* ── 초기화: Firestore 삭제 → localStorage 제거 → 로그아웃 → 리로드 ── */
+  async function handleReset(){
+    try{ await cRef().delete(); }catch(e){}
+    localStorage.removeItem('coupleId');
+    try{ await auth.signOut(); }catch(e){}
+    location.reload();
+  }
+
   if(appState==='loading') return <LoadingScreen/>;
   if(appState==='pairing') return <PairingScreen myUid={myUid} onPaired={handlePaired}/>;
 
@@ -1681,7 +1737,7 @@ function App(){
         {tab==='calendar'    &&<CalTab evs={evsMapped} addEv={addEv} delEv={delEv} updateEv={updateEv} coupleStart={coupleStart} annList={annList} names={names} U={dynU}/>}
         {tab==='anniversary' &&<AnnTab coupleStart={coupleStart} annList={annList} names={names}/>}
         {tab==='bucket'      &&<BkTab items={bkItems} onToggle={toggleBkItem} onAdd={addBkItem} allCats={allBucketCats} addCustomCat={addCustomCat}/>}
-        {tab==='profile'     &&<ProfTab names={names} setNames={saveNames} coupleStart={coupleStart} setCoupleStart={saveCoupleStart} birthdays={birthdays} setBirthdays={saveBirthdays} partnerUid={partnerUid} coupleId={coupleId} myUid={myUid} onSwitchCouple={id=>setCoupleId(id)} myGender={myGender} partnerGender={partnerGender} saveGender={saveGender}/>}
+        {tab==='profile'     &&<ProfTab names={names} setNames={saveNames} coupleStart={coupleStart} setCoupleStart={saveCoupleStart} birthdays={birthdays} setBirthdays={saveBirthdays} partnerUid={partnerUid} coupleId={coupleId} myUid={myUid} onSwitchCouple={id=>setCoupleId(id)} myGender={myGender} partnerGender={partnerGender} saveGender={saveGender} onReset={handleReset}/>}
       </div>
       <BTBar active={tab} setActive={setTab}/>
     </div>
