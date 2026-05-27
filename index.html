@@ -1234,6 +1234,7 @@ function ProfTab({names:initNames,setNames,coupleStart,setCoupleStart,birthdays:
   const [activePicker,setActivePicker]=useState(null);
   const [showResetConfirm,setShowResetConfirm]=useState(false);
   const [notifSt,setNotifSt]=useState('checking'); // checking|unsupported|no-pwa|denied|default|loading|granted
+  const [testSt,setTestSt]=useState('idle'); // idle|sending|ok|fail
   const meRef=useRef(null);
   const partnerRef=useRef(null);
 
@@ -1270,6 +1271,27 @@ function ProfTab({names:initNames,setNames,coupleStart,setCoupleStart,birthdays:
       await db.collection('couples').doc(coupleId).update({[`pushSubs.${myUid}`]:firebase.firestore.FieldValue.delete()});
       setNotifSt('default');
     }catch(e){}
+  }
+
+  /* 테스트 알림 — 내 기기로 직접 전송 */
+  async function sendTestNotif(){
+    setTestSt('sending');
+    try{
+      const reg=await navigator.serviceWorker.ready;
+      const sub=await reg.pushManager.getSubscription();
+      if(!sub) throw new Error('no sub');
+      const r=await fetch('/api/push',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          subscription:sub.toJSON(),
+          title:'테스트 알림 🔔',
+          body:'알림이 정상적으로 작동하고 있어요!'
+        })
+      });
+      setTestSt(r.ok?'ok':'fail');
+    }catch(e){setTestSt('fail');}
+    setTimeout(()=>setTestSt('idle'),3000);
   }
 
   function togglePicker(key){setActivePicker(p=>p===key?null:key);}
@@ -1433,11 +1455,20 @@ function ProfTab({names:initNames,setNames,coupleStart,setCoupleStart,birthdays:
                   </div>
                 </div>
                 {notifSt==='granted'?(
-                  <button onClick={disableNotif}
-                    style={{padding:'6px 14px',borderRadius:12,fontSize:12,fontWeight:600,
-                      background:V.sC,color:V.oSV,border:`1px solid ${V.ol}`,cursor:'pointer',flexShrink:0}}>
-                    끄기
-                  </button>
+                  <div style={{display:'flex',gap:6,flexShrink:0}}>
+                    <button onClick={sendTestNotif} disabled={testSt==='sending'}
+                      style={{padding:'6px 12px',borderRadius:12,fontSize:12,fontWeight:600,
+                        background:testSt==='ok'?'rgba(48,209,88,.12)':testSt==='fail'?'rgba(255,69,58,.1)':V.pC,
+                        color:testSt==='ok'?'#30D158':testSt==='fail'?'#FF453A':V.pri,
+                        border:'none',cursor:'pointer',transition:'all .2s'}}>
+                      {testSt==='sending'?'전송 중..':testSt==='ok'?'✓ 성공':testSt==='fail'?'✗ 실패':'테스트'}
+                    </button>
+                    <button onClick={disableNotif}
+                      style={{padding:'6px 12px',borderRadius:12,fontSize:12,fontWeight:600,
+                        background:V.sC,color:V.oSV,border:`1px solid ${V.ol}`,cursor:'pointer'}}>
+                      끄기
+                    </button>
+                  </div>
                 ):notifSt==='denied'?(
                   <span style={{fontSize:11,color:'#FF453A',fontWeight:600,flexShrink:0}}>차단됨</span>
                 ):notifSt==='loading'?(
