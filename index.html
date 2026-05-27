@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>우리 캘린더 🌸</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -21,19 +21,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-html,body{height:100%;overflow:hidden;}
-body{
-  font-family:'Roboto',sans-serif;
-  background:radial-gradient(ellipse at 30% 20%,#3a1a25 0%,#1a0f14 60%,#120810 100%);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  min-height:100vh;
-}
-.phone-frame{
-  width:390px;height:844px;border-radius:54px;position:relative;overflow:hidden;
-  box-shadow:0 0 0 1px rgba(255,255,255,.09),0 0 0 10px #1c1c1e,0 0 0 11px rgba(255,255,255,.06),0 60px 120px rgba(0,0,0,.6),0 20px 40px rgba(0,0,0,.4);
-  flex-shrink:0;
-}
-.notch{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:126px;height:37px;background:#000;border-radius:20px;z-index:200;pointer-events:none;}
+html,body{height:100%;overflow:hidden;background:#F9F9F9;}
+body{font-family:'Roboto',sans-serif;}
+.phone-frame{width:100%;height:100%;position:relative;overflow:hidden;}
 .app-root{width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;}
 .scr{overflow-y:auto;overflow-x:hidden;-ms-overflow-style:none;scrollbar-width:none;}
 .scr::-webkit-scrollbar{display:none;}
@@ -51,24 +41,8 @@ button{font-family:'Roboto',sans-serif;border:none;cursor:pointer;background:non
 </head>
 <body>
 <div class="phone-frame" id="frame">
-  <div class="notch"></div>
   <div id="app-mount" class="app-root"></div>
 </div>
-
-<script>
-(function(){
-  function scale(){
-    var frame=document.getElementById('frame');
-    var scaleX=Math.min(1,(window.innerWidth-40)/390);
-    var scaleY=Math.min(1,(window.innerHeight-40)/844);
-    var s=Math.min(scaleX,scaleY);
-    frame.style.transform='scale('+s+')';
-    frame.style.transformOrigin='center center';
-  }
-  scale();
-  window.addEventListener('resize',scale);
-})();
-</script>
 
 <!-- ★ Firebase 설정 — Firebase Console > 프로젝트 설정 > 웹 앱에서 복사 -->
 <script>
@@ -187,29 +161,10 @@ function annDate(a){
 }
 
 /* ═══════════════════════════════════════
-   STATUS BAR
+   SAFE AREA TOP SPACER (replaces mock status bar)
 ══════════════════════════════════════ */
 function SBar(){
-  const [time,setTime]=useState('');
-  useEffect(()=>{
-    function tick(){
-      const n=new Date();
-      setTime(`${n.getHours()}:${String(n.getMinutes()).padStart(2,'0')}`);
-    }
-    tick();
-    const t=setInterval(tick,10000);
-    return()=>clearInterval(t);
-  },[]);
-  return(
-    <div style={{height:50,padding:'16px 22px 0',display:'flex',alignItems:'center',justifyContent:'space-between',background:V.bg,flexShrink:0}}>
-      <span style={{fontSize:15,fontWeight:600,color:V.oS,letterSpacing:-.3}}>{time}</span>
-      <div style={{display:'flex',gap:5,alignItems:'center',color:V.oS}}>
-        <span className="material-symbols-outlined" style={{fontSize:14,fontVariationSettings:"'wght' 500"}}>signal_cellular_alt</span>
-        <span className="material-symbols-outlined" style={{fontSize:14,fontVariationSettings:"'wght' 500"}}>wifi</span>
-        <span className="material-symbols-outlined" style={{fontSize:14,fontVariationSettings:"'wght' 500"}}>battery_5_bar</span>
-      </div>
-    </div>
-  );
+  return <div style={{height:'env(safe-area-inset-top,0px)',background:V.bg,flexShrink:0}}/>;
 }
 
 /* ═══════════════════════════════════════
@@ -1590,7 +1545,7 @@ function BTBar({active,setActive}){
     {id:'profile',     ic:'person',        lb:'더보기'},
   ];
   return(
-    <div style={{height:83,paddingBottom:28,paddingTop:8,background:V.surf,borderTop:`1px solid ${V.ol}`,display:'flex',justifyContent:'space-around',alignItems:'flex-start',flexShrink:0,zIndex:20}}>
+    <div style={{paddingTop:8,paddingBottom:'env(safe-area-inset-bottom,8px)',background:V.surf,borderTop:`1px solid ${V.ol}`,display:'flex',justifyContent:'space-around',alignItems:'flex-start',flexShrink:0,zIndex:20}}>
       {tabs.map(t=>{
         const on=t.id===active;
         return(
