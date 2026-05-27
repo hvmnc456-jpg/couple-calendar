@@ -1,6 +1,9 @@
-{
-  "devDependencies": {
-    "@babel/core": "^7.29.7",
-    "@babel/plugin-transform-react-jsx": "^7.29.7"
-  }
+﻿{
+    "devDependencies":  {
+                            "@babel/plugin-transform-react-jsx":  "^7.27.1",
+                            "@babel/core":  "^7.27.1"
+                        },
+    "dependencies":  {
+                         "web-push":  "^3.6.7"
+                     }
 }

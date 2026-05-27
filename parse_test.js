@@ -9,7 +9,5 @@ try {
   console.log('PARSE SUCCESS - code length:', result.code.length);
 } catch(e) {
   console.error('PARSE ERROR:', e.message);
-  if (e.loc) {
-    console.error('Line:', e.loc.line, 'Col:', e.loc.column);
-  }
+  if (e.loc) { console.error('Line:', e.loc.line, 'Col:', e.loc.column); }
 }
