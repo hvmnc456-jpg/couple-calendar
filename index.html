@@ -920,34 +920,75 @@ function BkTab({items,onToggle,onAdd,onDel,allCats:catList,addCustomCat,customCa
   const [showAdd,setShowAdd]=useState(false);
   const [selBk,setSelBk]=useState(null);
   const [editCat,setEditCat]=useState(false);
-  const done=items.filter(i=>i.done).length;
+  const [mainTab,setMainTab]=useState('doing');
+  const doingItems=items.filter(i=>!i.done);
+  const doneItems=items.filter(i=>i.done);
+  const done=doneItems.length;
   const total=items.length;
   const usedCats=[...new Set(items.map(i=>i.cat))];
   const allCats=[...new Set([...(catList||BASE_CATS),...usedCats])];
   const cats=['전체',...allCats];
-  const filt=fil==='전체'?items:items.filter(i=>i.cat===fil);
+  const activeItems=mainTab==='doing'?doingItems:doneItems;
+  const filt=fil==='전체'?activeItems:activeItems.filter(i=>i.cat===fil);
   const pct=total?Math.round(done/total*100):0;
 
   return(
     <div style={{flex:1,overflow:'hidden',position:'relative',display:'flex',flexDirection:'column',background:V.bg}}>
       <div className="scr" style={{flex:1,overflowY:'auto',padding:'10px 14px 88px'}}>
-        {/* Progress card */}
-        <div style={{background:V.surf,borderRadius:20,padding:'18px 18px 16px',marginBottom:16,border:`1px solid ${V.ol}`,boxShadow:'0 2px 8px rgba(0,0,0,.04)'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
-            <div>
-              <div style={{fontSize:15,fontWeight:600,color:V.oS,letterSpacing:-.3}}>함께하고 싶은 것들</div>
-              <div style={{fontSize:11,color:V.oSV,marginTop:3}}>{done===total?'🎉 모두 달성했어요!':done===0?'첫 번째 도전을 완료해보세요!':`${total-done}개 남았어요`}</div>
-            </div>
-            <div style={{textAlign:'right'}}>
-              <div style={{fontSize:22,fontWeight:700,color:V.pri,letterSpacing:-1}}>{done}</div>
-              <div style={{fontSize:11,color:V.oSV}}>/ {total}</div>
-            </div>
-          </div>
-          <div style={{height:8,background:V.sC,borderRadius:4,overflow:'hidden'}}>
-            <div style={{height:'100%',width:`${pct}%`,background:`linear-gradient(90deg,${V.pri},#E57373)`,borderRadius:4,transition:'width .4s cubic-bezier(.34,1.56,.64,1)'}}/>
-          </div>
-          <div style={{fontSize:10,color:V.oSV,marginTop:6,textAlign:'right'}}>{pct}% 완료</div>
+        {/* 진행중 / 완료 탭 스위처 */}
+        <div style={{display:'flex',background:V.sC,borderRadius:12,padding:3,marginBottom:14}}>
+          {[['doing','진행중',doingItems.length],['done','완료',doneItems.length]].map(([id,lb,cnt])=>(
+            <button key={id} onClick={()=>{setMainTab(id);setFil('전체');setEditCat(false);}}
+              style={{flex:1,padding:'8px 4px',borderRadius:10,
+                background:mainTab===id?V.surf:'transparent',
+                color:mainTab===id?V.oS:V.oSV,
+                fontSize:13,fontWeight:mainTab===id?600:400,
+                transition:'all .2s',border:'none',cursor:'pointer',
+                boxShadow:mainTab===id?'0 1px 4px rgba(0,0,0,.1)':'none',
+                display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+              {lb}
+              <span style={{fontSize:11,fontWeight:700,
+                background:mainTab===id?V.pri:'rgba(0,0,0,.08)',
+                color:mainTab===id?'#fff':V.oSV,
+                borderRadius:10,padding:'1px 7px',minWidth:18,textAlign:'center'}}>
+                {cnt}
+              </span>
+            </button>
+          ))}
         </div>
+
+        {/* Progress card — 진행중 탭 */}
+        {mainTab==='doing'&&(
+          <div style={{background:V.surf,borderRadius:20,padding:'18px 18px 16px',marginBottom:16,border:`1px solid ${V.ol}`,boxShadow:'0 2px 8px rgba(0,0,0,.04)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+              <div>
+                <div style={{fontSize:15,fontWeight:600,color:V.oS,letterSpacing:-.3}}>함께하고 싶은 것들</div>
+                <div style={{fontSize:11,color:V.oSV,marginTop:3}}>{doingItems.length===0?'🎉 모두 달성했어요!':done===0?'첫 번째 도전을 완료해보세요!':`${doingItems.length}개 남았어요`}</div>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:22,fontWeight:700,color:V.pri,letterSpacing:-1}}>{done}</div>
+                <div style={{fontSize:11,color:V.oSV}}>/ {total}</div>
+              </div>
+            </div>
+            <div style={{height:8,background:V.sC,borderRadius:4,overflow:'hidden'}}>
+              <div style={{height:'100%',width:`${pct}%`,background:`linear-gradient(90deg,${V.pri},#E57373)`,borderRadius:4,transition:'width .4s cubic-bezier(.34,1.56,.64,1)'}}/>
+            </div>
+            <div style={{fontSize:10,color:V.oSV,marginTop:6,textAlign:'right'}}>{pct}% 완료</div>
+          </div>
+        )}
+
+        {/* Completion card — 완료 탭 */}
+        {mainTab==='done'&&(
+          <div style={{background:V.surf,borderRadius:20,padding:'16px 18px',marginBottom:16,border:`1px solid ${V.ol}`,boxShadow:'0 2px 8px rgba(0,0,0,.04)',display:'flex',alignItems:'center',gap:14}}>
+            <div style={{width:46,height:46,borderRadius:14,background:V.pC,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+              <span className="material-symbols-outlined" style={{fontSize:24,color:V.pri,fontVariationSettings:"'FILL' 1"}}>check_circle</span>
+            </div>
+            <div>
+              <div style={{fontSize:15,fontWeight:600,color:V.oS,letterSpacing:-.3}}>함께 이뤄낸 것들 🎉</div>
+              <div style={{fontSize:12,color:V.oSV,marginTop:3}}>{done>0?`${done}개 완료했어요`:'아직 완료한 항목이 없어요'}</div>
+            </div>
+          </div>
+        )}
 
         {/* Category filters */}
         <div style={{display:'flex',gap:8,marginBottom:14,overflowX:'auto',paddingBottom:2,alignItems:'center'}}>
@@ -1007,23 +1048,35 @@ function BkTab({items,onToggle,onAdd,onDel,allCats:catList,addCustomCat,customCa
           </div>
         ))}
 
-        {/* Add trigger */}
-        <button onClick={()=>setShowAdd(true)}
-          style={{display:'flex',alignItems:'center',gap:10,width:'100%',
-            background:V.surf,borderRadius:14,padding:'12px 14px',
-            border:`1.5px dashed ${V.ol}`,marginTop:4,cursor:'pointer'}}>
-          <span className="material-symbols-outlined" style={{fontSize:20,color:V.oSV}}>add</span>
-          <span style={{fontSize:14,color:V.oSV}}>새 버킷리스트 추가…</span>
-        </button>
+        {/* 완료 탭 빈 상태 */}
+        {filt.length===0&&mainTab==='done'&&(
+          <div style={{textAlign:'center',padding:'40px 0',color:V.oSV}}>
+            <span className="material-symbols-outlined" style={{fontSize:48,display:'block',marginBottom:10,opacity:.18}}>check_circle</span>
+            <div style={{fontSize:14,fontWeight:500,opacity:.45}}>완료한 항목이 없어요</div>
+          </div>
+        )}
+
+        {/* Add trigger — 진행중 탭만 */}
+        {mainTab==='doing'&&(
+          <button onClick={()=>setShowAdd(true)}
+            style={{display:'flex',alignItems:'center',gap:10,width:'100%',
+              background:V.surf,borderRadius:14,padding:'12px 14px',
+              border:`1.5px dashed ${V.ol}`,marginTop:4,cursor:'pointer'}}>
+            <span className="material-symbols-outlined" style={{fontSize:20,color:V.oSV}}>add</span>
+            <span style={{fontSize:14,color:V.oSV}}>새 버킷리스트 추가…</span>
+          </button>
+        )}
       </div>
 
-      {/* FAB */}
-      <button onClick={()=>setShowAdd(true)}
-        style={{position:'absolute',bottom:16,right:18,width:52,height:52,borderRadius:'50%',
-          background:V.pri,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',
-          boxShadow:'0 4px 16px rgba(212,96,122,.45)',zIndex:10}}>
-        <span className="material-symbols-outlined" style={{fontSize:26}}>add</span>
-      </button>
+      {/* FAB — 진행중 탭만 */}
+      {mainTab==='doing'&&(
+        <button onClick={()=>setShowAdd(true)}
+          style={{position:'absolute',bottom:16,right:18,width:52,height:52,borderRadius:'50%',
+            background:V.pri,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',
+            boxShadow:'0 4px 16px rgba(212,96,122,.45)',zIndex:10}}>
+          <span className="material-symbols-outlined" style={{fontSize:26}}>add</span>
+        </button>
+      )}
 
       {showAdd&&<BkAddSht
         defaultCat={fil==='전체'?'데이트':fil}
