@@ -2106,26 +2106,48 @@ ReactDOM.createRoot(document.getElementById('app-mount')).render(<App/>);
 </script>
 
 <script>
+/* ── version.json 기반 업데이트 감지 (배포마다 정확히 동작) ── */
+(function(){
+  function notifyUpdate(){
+    window.__swUpdateReady=true;
+    window.dispatchEvent(new CustomEvent('sw-update'));
+  }
+  function checkVersion(){
+    fetch('/version.json?t='+Date.now(),{cache:'no-store'})
+      .then(function(r){return r.json();})
+      .then(function(data){
+        var stored=localStorage.getItem('_appVer');
+        if(!stored){localStorage.setItem('_appVer',String(data.v));return;}
+        if(String(stored)!==String(data.v)){
+          localStorage.setItem('_appVer',String(data.v));
+          notifyUpdate();
+        }
+      }).catch(function(){});
+  }
+  checkVersion();
+  setInterval(checkVersion,5*60*1000);
+})();
+
+/* ── 서비스 워커 등록 (오프라인 지원) ── */
 if('serviceWorker' in navigator){
   let refreshing=false;
-  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+  navigator.serviceWorker.addEventListener('controllerchange',function(){
     if(!refreshing){refreshing=true;location.reload();}
   });
-  window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('/sw.js').then(reg=>{
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('/sw.js').then(function(reg){
       function offerReload(worker){
         window.__swWaiting=worker;
         window.__swUpdateReady=true;
         window.dispatchEvent(new CustomEvent('sw-update'));
       }
       if(reg.waiting) offerReload(reg.waiting);
-      reg.addEventListener('updatefound',()=>{
-        const nw=reg.installing;
-        nw.addEventListener('statechange',()=>{
+      reg.addEventListener('updatefound',function(){
+        var nw=reg.installing;
+        nw.addEventListener('statechange',function(){
           if(nw.state==='installed'&&navigator.serviceWorker.controller) offerReload(nw);
         });
       });
-      setInterval(()=>reg.update(),3600000);
     });
   });
 }
