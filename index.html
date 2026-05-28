@@ -1478,8 +1478,8 @@ function ProfTab({names:initNames,setNames,coupleStart,setCoupleStart,birthdays:
         </div>
       </div>
       {activePicker==='couple_start'&&(
-        <div style={{background:V.surf,borderRadius:16,border:`1px solid ${V.ol}`,padding:'12px',marginBottom:20,marginTop:-8}}>
-          <CalPicker value={csStr||TODAY_STR} onSelect={v=>{const[y,m,d]=v.split('-').map(Number);setCoupleStart(new Date(y,m-1,d));setActivePicker(null);}}/>
+        <div style={{background:V.surf,borderRadius:16,border:`1px solid ${V.ol}`,padding:'14px 12px 12px',marginBottom:20,marginTop:-8}}>
+          <DrumPicker value={csStr||TODAY_STR} onSelect={v=>{const[y,m,d]=v.split('-').map(Number);setCoupleStart(new Date(y,m-1,d));setActivePicker(null);}}/>
         </div>
       )}
 
