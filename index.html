@@ -955,7 +955,7 @@ function BkTab({items,onToggle,onAdd,onDel,allCats:catList,addCustomCat,customCa
             const isDel=editCat&&(customCats||[]).includes(c);
             return(
               <div key={c} style={{position:'relative',flexShrink:0,display:'flex',alignItems:'center'}}>
-                <button onClick={()=>{if(!editCat)setFil(c);}}
+                <button onClick={()=>setFil(c)}
                   style={{padding:'6px 16px',paddingRight:isDel?26:16,borderRadius:20,
                     background:fil===c?V.pri:V.sC,color:fil===c?'#fff':V.oSV,
                     fontSize:12,fontWeight:500,whiteSpace:'nowrap',transition:'all .15s',
