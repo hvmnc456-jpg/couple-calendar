@@ -127,10 +127,18 @@ function buildAnnList(cs,names,bdays){
   if(cs){
     const sMo=cs.getMonth()+1,sDy=cs.getDate(),sYr=cs.getFullYear();
     list.push({id:id++,ti:'처음 만난 날 ❤️',mo:sMo,dy:sDy,yr:null,rc:true});
-    const d100=new Date(cs.getTime()+99*DMS);
-    list.push({id:id++,ti:'100일 기념 🎉',mo:d100.getMonth()+1,dy:d100.getDate(),yr:d100.getFullYear(),rc:false});
-    const cYr=TODAY.getFullYear();
-    for(let y=sYr+1;y<=cYr+3;y++){
+    const maxDt=new Date(TODAY.getTime()+3*366*DMS);
+    // 100일 단위 기념일 (오늘 기준 +3년까지)
+    for(let n=100;;n+=100){
+      const md=new Date(cs.getTime()+(n-1)*DMS);
+      if(md>maxDt) break;
+      const em=n===100?'🎉':n%1000===0?'🎊':n%500===0?'🌟':'💕';
+      list.push({id:id++,ti:`${n}일 기념 ${em}`,mo:md.getMonth()+1,dy:md.getDate(),yr:md.getFullYear(),rc:false});
+    }
+    // 주년 기념일 (오늘 기준 +3년까지)
+    for(let y=sYr+1;;y++){
+      const annDt=new Date(y,sMo-1,sDy);
+      if(annDt>maxDt) break;
       const n=y-sYr,em=n===1?'🥂':n===2?'🎊':'✨';
       list.push({id:id++,ti:`${n}주년 ${em}`,mo:sMo,dy:sDy,yr:y,rc:false});
     }
