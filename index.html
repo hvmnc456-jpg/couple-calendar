@@ -915,10 +915,11 @@ function BkDetSht({item,onClose,onToggle,onDel}){
   );
 }
 
-function BkTab({items,onToggle,onAdd,onDel,allCats:catList,addCustomCat}){
+function BkTab({items,onToggle,onAdd,onDel,allCats:catList,addCustomCat,customCats,delCustomCat}){
   const [fil,setFil]=useState('전체');
   const [showAdd,setShowAdd]=useState(false);
   const [selBk,setSelBk]=useState(null);
+  const [editCat,setEditCat]=useState(false);
   const done=items.filter(i=>i.done).length;
   const total=items.length;
   const usedCats=[...new Set(items.map(i=>i.cat))];
@@ -949,12 +950,44 @@ function BkTab({items,onToggle,onAdd,onDel,allCats:catList,addCustomCat}){
         </div>
 
         {/* Category filters */}
-        <div style={{display:'flex',gap:8,marginBottom:14,overflowX:'auto',paddingBottom:2}}>
-          {cats.map(c=>(
-            <button key={c} onClick={()=>setFil(c)} style={{padding:'6px 16px',borderRadius:20,background:fil===c?V.pri:V.sC,color:fil===c?'#fff':V.oSV,fontSize:12,fontWeight:500,whiteSpace:'nowrap',flexShrink:0,transition:'all .15s'}}>
-              {c}
+        <div style={{display:'flex',gap:8,marginBottom:14,overflowX:'auto',paddingBottom:2,alignItems:'center'}}>
+          {cats.map(c=>{
+            const isDel=editCat&&(customCats||[]).includes(c);
+            return(
+              <div key={c} style={{position:'relative',flexShrink:0,display:'flex',alignItems:'center'}}>
+                <button onClick={()=>{if(!editCat)setFil(c);}}
+                  style={{padding:'6px 16px',paddingRight:isDel?26:16,borderRadius:20,
+                    background:fil===c?V.pri:V.sC,color:fil===c?'#fff':V.oSV,
+                    fontSize:12,fontWeight:500,whiteSpace:'nowrap',transition:'all .15s',
+                    border:'none',cursor:'pointer'}}>
+                  {c}
+                </button>
+                {isDel&&(
+                  <button
+                    onClick={e=>{e.stopPropagation();if(fil===c)setFil('전체');delCustomCat(c);}}
+                    style={{position:'absolute',right:6,top:'50%',transform:'translateY(-50%)',
+                      width:16,height:16,borderRadius:'50%',
+                      background:'rgba(0,0,0,.28)',color:'#fff',
+                      display:'flex',alignItems:'center',justifyContent:'center',
+                      fontSize:12,fontWeight:900,border:'none',cursor:'pointer',
+                      padding:0,lineHeight:1}}>
+                    ×
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          {(customCats||[]).length>0&&(
+            <button onClick={()=>setEditCat(e=>!e)}
+              style={{flexShrink:0,padding:'6px 10px',borderRadius:20,
+                background:editCat?V.pri:V.sC,color:editCat?'#fff':V.oSV,
+                fontSize:12,fontWeight:500,whiteSpace:'nowrap',
+                display:'flex',alignItems:'center',gap:2,
+                border:'none',cursor:'pointer',transition:'all .15s'}}>
+              <span className="material-symbols-outlined" style={{fontSize:13}}>{editCat?'check':'edit'}</span>
+              {editCat?'완료':'편집'}
             </button>
-          ))}
+          )}
         </div>
 
         {/* Items */}
@@ -1909,6 +1942,9 @@ function App(){
     if(!cat||allBucketCats.includes(cat)) return;
     return cRef().update({customCats:[...customCats,cat]});
   }
+  function deleteCustomCat(cat){
+    return cRef().update({customCats:customCats.filter(c=>c!==cat)});
+  }
 
   /* ── 파트너에게 푸시 알림 전송 ── */
   async function sendPush(title,body){
@@ -1993,7 +2029,7 @@ function App(){
       <div style={{flex:1,overflow:'hidden',position:'relative',display:'flex',flexDirection:'column'}}>
         {tab==='calendar'    &&<CalTab evs={evsMapped} addEv={addEv} delEv={delEv} updateEv={updateEv} coupleStart={coupleStart} annList={annList} names={names} U={dynU}/>}
         {tab==='anniversary' &&<AnnTab coupleStart={coupleStart} annList={annList} names={names}/>}
-        {tab==='bucket'      &&<BkTab items={bkItems} onToggle={toggleBkItem} onAdd={addBkItem} onDel={delBkItem} allCats={allBucketCats} addCustomCat={addCustomCat}/>}
+        {tab==='bucket'      &&<BkTab items={bkItems} onToggle={toggleBkItem} onAdd={addBkItem} onDel={delBkItem} allCats={allBucketCats} addCustomCat={addCustomCat} customCats={customCats} delCustomCat={deleteCustomCat}/>}
         {tab==='profile'     &&<ProfTab names={names} setNames={saveNames} coupleStart={coupleStart} setCoupleStart={saveCoupleStart} birthdays={birthdays} setBirthdays={saveBirthdays} partnerUid={partnerUid} coupleId={coupleId} myUid={myUid} onSwitchCouple={id=>setCoupleId(id)} myGender={myGender} partnerGender={partnerGender} saveGender={saveGender} onReset={handleReset} calName={calName} saveCalName={saveCalName}/>}
       </div>
       <BTBar active={tab} setActive={setTab}/>
