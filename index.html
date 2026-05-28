@@ -952,7 +952,7 @@ function BkTab({items,onToggle,onAdd,onDel,allCats:catList,addCustomCat,customCa
         {/* Category filters */}
         <div style={{display:'flex',gap:8,marginBottom:14,overflowX:'auto',paddingBottom:2,alignItems:'center'}}>
           {cats.map(c=>{
-            const isDel=editCat&&(customCats||[]).includes(c);
+            const isDel=editCat&&c!=='전체';
             return(
               <div key={c} style={{position:'relative',flexShrink:0,display:'flex',alignItems:'center'}}>
                 <button onClick={()=>setFil(c)}
@@ -977,7 +977,7 @@ function BkTab({items,onToggle,onAdd,onDel,allCats:catList,addCustomCat,customCa
               </div>
             );
           })}
-          {(customCats||[]).length>0&&(
+          {allCats.length>0&&(
             <button onClick={()=>setEditCat(e=>!e)}
               style={{flexShrink:0,padding:'6px 10px',borderRadius:20,
                 background:editCat?V.pri:V.sC,color:editCat?'#fff':V.oSV,
@@ -1937,12 +1937,16 @@ function App(){
 
   /* ── 버킷 카테고리 ── */
   const customCats=coupleDoc?.customCats||[];
-  const allBucketCats=[...new Set([...BASE_CATS,...customCats])];
+  const deletedCats=coupleDoc?.deletedCats||[];
+  const allBucketCats=[...new Set([...BASE_CATS.filter(c=>!deletedCats.includes(c)),...customCats])];
   function addCustomCat(cat){
     if(!cat||allBucketCats.includes(cat)) return;
     return cRef().update({customCats:[...customCats,cat]});
   }
-  function deleteCustomCat(cat){
+  function deleteCat(cat){
+    if(BASE_CATS.includes(cat)){
+      return cRef().update({deletedCats:[...deletedCats,cat]});
+    }
     return cRef().update({customCats:customCats.filter(c=>c!==cat)});
   }
 
@@ -2029,7 +2033,7 @@ function App(){
       <div style={{flex:1,overflow:'hidden',position:'relative',display:'flex',flexDirection:'column'}}>
         {tab==='calendar'    &&<CalTab evs={evsMapped} addEv={addEv} delEv={delEv} updateEv={updateEv} coupleStart={coupleStart} annList={annList} names={names} U={dynU}/>}
         {tab==='anniversary' &&<AnnTab coupleStart={coupleStart} annList={annList} names={names}/>}
-        {tab==='bucket'      &&<BkTab items={bkItems} onToggle={toggleBkItem} onAdd={addBkItem} onDel={delBkItem} allCats={allBucketCats} addCustomCat={addCustomCat} customCats={customCats} delCustomCat={deleteCustomCat}/>}
+        {tab==='bucket'      &&<BkTab items={bkItems} onToggle={toggleBkItem} onAdd={addBkItem} onDel={delBkItem} allCats={allBucketCats} addCustomCat={addCustomCat} customCats={customCats} delCustomCat={deleteCat}/>}
         {tab==='profile'     &&<ProfTab names={names} setNames={saveNames} coupleStart={coupleStart} setCoupleStart={saveCoupleStart} birthdays={birthdays} setBirthdays={saveBirthdays} partnerUid={partnerUid} coupleId={coupleId} myUid={myUid} onSwitchCouple={id=>setCoupleId(id)} myGender={myGender} partnerGender={partnerGender} saveGender={saveGender} onReset={handleReset} calName={calName} saveCalName={saveCalName}/>}
       </div>
       <BTBar active={tab} setActive={setTab}/>
