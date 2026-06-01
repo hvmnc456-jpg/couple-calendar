@@ -21,7 +21,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-html,body{height:100%;overflow:hidden;background:#F9F9F9;}
+html,body{height:100%;overscroll-behavior:none;background:#F9F9F9;}
 body{font-family:'Roboto',sans-serif;}
 .phone-frame{width:100%;height:100%;position:relative;overflow:hidden;}
 .app-root{width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;}
@@ -1695,7 +1695,7 @@ function BTBar({active,setActive}){
     {id:'profile',     ic:'person',        lb:'더보기'},
   ];
   return(
-    <div style={{position:'fixed',bottom:0,left:0,right:0,paddingTop:8,paddingBottom:'env(safe-area-inset-bottom,0px)',background:V.surf,borderTop:`1px solid ${V.ol}`,display:'flex',justifyContent:'space-around',alignItems:'flex-start',zIndex:100}}>
+    <div style={{position:'fixed',bottom:0,left:0,right:0,boxSizing:'content-box',height:51,paddingTop:8,paddingBottom:'env(safe-area-inset-bottom,0px)',background:V.surf,borderTop:`1px solid ${V.ol}`,display:'flex',justifyContent:'space-around',alignItems:'flex-start',zIndex:100}}>
       {tabs.map(t=>{
         const on=t.id===active;
         return(
