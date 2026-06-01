@@ -194,13 +194,14 @@ function AHdr({names,U,calName}){
 /* ═══════════════════════════════════════
    CALENDAR TAB
 ══════════════════════════════════════ */
-function CalTab({evs,addEv,delEv,updateEv,coupleStart,annList,names,U}){
+function CalTab({evs,addEv,delEv,updateEv,coupleStart,annList,names,U,holidays={},onFetchYear}){
   const [cm,setCm]=useState(new Date(TODAY.getFullYear(),TODAY.getMonth(),1));
   const [sel,setSel]=useState(TODAY_STR);
   const [showAdd,setAdd]=useState(false);
   const [det,setDet]=useState(null);
   const [edit,setEdit]=useState(null);
   const yr=cm.getFullYear(),mo=cm.getMonth();
+  useEffect(()=>{if(onFetchYear){onFetchYear(yr);if(mo===11)onFetchYear(yr+1);}},[cm]);
   const fdw=new Date(yr,mo,1).getDay(),dim=new Date(yr,mo+1,0).getDate();
   const selEvs=evs.filter(e=>e.ed?sel>=e.dt&&sel<=e.ed:e.dt===sel);
 
@@ -268,7 +269,8 @@ function CalTab({evs,addEv,delEv,updateEv,coupleStart,annList,names,U}){
 
           /* 이 주에 걸치는 연일 일정 */
           const wBars=evs.filter(e=>e.ed&&e.ed!==e.dt&&e.dt<=wEnd&&e.ed>=wStart);
-          const cellH=44+wBars.length*13;
+          const hasHolInWeek=wDates.some(d=>d&&holidays[d]);
+          const cellH=(hasHolInWeek?54:44)+wBars.length*13;
 
           return(
             <div key={w} style={{position:'relative',marginBottom:2}}>
@@ -280,15 +282,17 @@ function CalTab({evs,addEv,delEv,updateEv,coupleStart,annList,names,U}){
                   /* 단일 일정만 pill 표시 (연일 일정은 bar로 표시) */
                   const sDEvs=evs.filter(e=>(!e.ed||e.ed===e.dt)&&e.dt===dateStr);
                   const isSel=dateStr===sel,isTod=dateStr===TODAY_STR;
+                  const isHol=!!(holidays&&holidays[dateStr]);
                   return(
                     <div key={dateStr} onClick={()=>setSel(dateStr)}
                       style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'3px 1px 4px',
                         cursor:'pointer',borderRadius:10,minHeight:cellH,
                         background:isSel?V.pri:isTod?V.pC:'transparent',transition:'background .15s'}}>
                       <span style={{fontSize:13,fontWeight:isSel?700:isTod?600:400,lineHeight:'20px',
-                        color:isSel?'#fff':isTod?V.pri:col===0?'#FF453A':col===6?'#5E8EE0':V.oS}}>
+                        color:isSel?'#fff':isTod?V.pri:(isHol||col===0)?'#FF453A':col===6?'#5E8EE0':V.oS}}>
                         {day}
                       </span>
+                      {isHol&&<span style={{fontSize:6.5,fontWeight:600,color:isSel?'rgba(255,255,255,.85)':'#FF453A',lineHeight:1,marginTop:1,maxWidth:'95%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',letterSpacing:.1}}>{(holidays[dateStr]||'').slice(0,4)}</span>}
                       {sDEvs.length>0&&(
                         <div style={{marginTop:2,fontSize:7.5,fontWeight:600,
                           background:isSel?'rgba(255,255,255,.22)':U[sDEvs[0].u]?.light||'rgba(155,114,200,.12)',
@@ -342,6 +346,13 @@ function CalTab({evs,addEv,delEv,updateEv,coupleStart,annList,names,U}){
         <div style={{fontSize:11,fontWeight:700,color:V.oSV,marginBottom:8,letterSpacing:.8,textTransform:'uppercase'}}>
           {sel===TODAY_STR?'오늘':sel.replace(/-/g,'.')}
         </div>
+        {holidays&&holidays[sel]&&(
+          <div style={{display:'flex',alignItems:'center',gap:8,background:'rgba(255,69,58,.07)',borderRadius:12,padding:'9px 12px',marginBottom:8,border:'1px solid rgba(255,69,58,.12)'}}>
+            <span className="material-symbols-outlined" style={{fontSize:15,color:'#FF453A',fontVariationSettings:"'FILL' 1"}}>flag</span>
+            <span style={{fontSize:13,fontWeight:600,color:'#FF453A'}}>{holidays[sel]}</span>
+            <span style={{fontSize:10,color:'rgba(255,69,58,.55)',marginLeft:'auto',fontWeight:500}}>법정공휴일</span>
+          </div>
+        )}
         {selEvs.length===0
           ?<div style={{textAlign:'center',padding:'18px 0',color:V.oSV,fontSize:13}}>
             <span className="material-symbols-outlined" style={{fontSize:30,display:'block',marginBottom:6,opacity:.25}}>event_note</span>
@@ -1894,6 +1905,8 @@ function App(){
   const [evs,setEvs]=useState([]);
   const [bkItems,setBkItems]=useState([]);
   const [hasUpdate,setHasUpdate]=useState(false);
+  const [holidays,setHolidays]=useState({});
+  const fetchedYearsRef=useRef(new Set());
 
   /* ── SW 업데이트 감지 ── */
   useEffect(()=>{
@@ -1979,6 +1992,35 @@ function App(){
   const myGender=coupleDoc?.genders?.[myUid]||null;
   const partnerGender=partnerUid?(coupleDoc?.genders?.[partnerUid]||null):null;
   function saveGender(g){return cRef().update({[`genders.${myUid}`]:g});}
+
+  /* ── 법정공휴일 (nager.at, 1주일 캐시) ── */
+  async function fetchHolidaysYear(year){
+    if(fetchedYearsRef.current.has(year)) return;
+    const key=`_hols_KR_${year}`;
+    let cached=null;
+    try{cached=JSON.parse(localStorage.getItem(key)||'null');}catch(e){}
+    if(cached&&Date.now()-cached.ts<7*24*60*60*1000){
+      fetchedYearsRef.current.add(year);
+      setHolidays(h=>({...h,...cached.data}));
+      return;
+    }
+    fetchedYearsRef.current.add(year);
+    try{
+      const res=await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/KR`);
+      if(!res.ok) return;
+      const list=await res.json();
+      const data={};
+      list.forEach(item=>{data[item.date]=item.localName;});
+      localStorage.setItem(key,JSON.stringify({ts:Date.now(),data}));
+      setHolidays(h=>({...h,...data}));
+    }catch(e){}
+  }
+  useEffect(()=>{
+    if(appState!=='ready') return;
+    const yr=TODAY.getFullYear();
+    fetchHolidaysYear(yr);
+    fetchHolidaysYear(yr+1);
+  },[appState]);
 
   /* ── 성별 기반 동적 색상 (남=파랑, 여=분홍, 미설정=기본값 유지) ── */
   const _gc=g=>g==='M'?'#4B8FE0':g==='F'?'#E86D8A':null;
@@ -2092,7 +2134,7 @@ function App(){
       <SBar/>
       <AHdr names={names} U={dynU} calName={calName}/>
       <div style={{flex:1,overflow:'hidden',position:'relative',display:'flex',flexDirection:'column'}}>
-        {tab==='calendar'    &&<CalTab evs={evsMapped} addEv={addEv} delEv={delEv} updateEv={updateEv} coupleStart={coupleStart} annList={annList} names={names} U={dynU}/>}
+        {tab==='calendar'    &&<CalTab evs={evsMapped} addEv={addEv} delEv={delEv} updateEv={updateEv} coupleStart={coupleStart} annList={annList} names={names} U={dynU} holidays={holidays} onFetchYear={fetchHolidaysYear}/>}
         {tab==='anniversary' &&<AnnTab coupleStart={coupleStart} annList={annList} names={names}/>}
         {tab==='bucket'      &&<BkTab items={bkItems} onToggle={toggleBkItem} onAdd={addBkItem} onDel={delBkItem} allCats={allBucketCats} addCustomCat={addCustomCat} customCats={customCats} delCustomCat={deleteCat}/>}
         {tab==='profile'     &&<ProfTab names={names} setNames={saveNames} coupleStart={coupleStart} setCoupleStart={saveCoupleStart} birthdays={birthdays} setBirthdays={saveBirthdays} partnerUid={partnerUid} coupleId={coupleId} myUid={myUid} onSwitchCouple={id=>setCoupleId(id)} myGender={myGender} partnerGender={partnerGender} saveGender={saveGender} onReset={handleReset} calName={calName} saveCalName={saveCalName}/>}
