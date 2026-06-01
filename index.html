@@ -21,10 +21,11 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-html,body{height:100%;min-height:100dvh;overscroll-behavior:none;background:#F9F9F9;}
+html,body{height:100%;min-height:100dvh;overscroll-behavior:none;background:#FFFFFF;}
+body::after{content:'';position:fixed;left:0;right:0;bottom:0;height:env(safe-area-inset-bottom,0px);background:#FFFFFF;z-index:99;pointer-events:none;}
 body{font-family:'Roboto',sans-serif;}
-.phone-frame{position:fixed;inset:0;}
-.app-root{position:fixed;inset:0;display:flex;flex-direction:column;}
+.phone-frame{position:fixed;inset:0;height:100dvh;}
+.app-root{position:fixed;inset:0;height:100dvh;display:flex;flex-direction:column;}
 .scr{overflow-y:auto;overflow-x:hidden;-ms-overflow-style:none;scrollbar-width:none;}
 .scr::-webkit-scrollbar{display:none;}
 .ovl{position:absolute;inset:0;background:rgba(0,0,0,.42);z-index:150;display:flex;flex-direction:column;justify-content:flex-end;animation:fdi .2s ease;}
@@ -2154,7 +2155,7 @@ function App(){
   if(appState==='pairing') return <PairingScreen myUid={myUid} onPaired={handlePaired}/>;
 
   return(
-    <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,display:'flex',flexDirection:'column',background:V.bg,fontFamily:"'Roboto',sans-serif"}}>
+    <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,height:'100dvh',display:'flex',flexDirection:'column',background:V.bg,fontFamily:"'Roboto',sans-serif"}}>
       {hasUpdate&&<UpdateBanner onRestart={handleRestart}/>}
       <SBar/>
       <AHdr names={names} U={dynU} calName={calName}/>
