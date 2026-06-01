@@ -519,7 +519,7 @@ function AddSht({sel,onClose,onAdd,names,U}){
 
         <FRow icon="person">
           <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
-            {Object.entries(U).filter(([id])=>id!=='partner').map(([id,info])=>(
+            {Object.entries(U).map(([id,info])=>(
               <button key={id} onClick={()=>setU(id)} style={{padding:'5px 13px',borderRadius:20,background:u===id?info.color:info.light,color:u===id?'#fff':info.color,fontSize:12,fontWeight:600,transition:'all .15s'}}>
                 {id==='both'?'함께 🤝':(names?.[id]||info.name)}
               </button>
@@ -619,7 +619,7 @@ function DetSht({ev,onClose,onDel,onEdit,names,U}){
 /* ── 일정 변경 시트 ── */
 function EditSht({ev,onClose,onSave,names,U}){
   const [ti,setTi]=useState(ev.ti);
-  const [u,setU]=useState(ev.u==='partner'?'me':ev.u); // 상대방 일정은 편집 시 [나]로 기본 설정
+  const [u,setU]=useState(ev.u);
   const [sd,setSd]=useState(ev.dt);
   const [ed,setEd]=useState(ev.ed||ev.dt);
   const [picker,setPicker]=useState(null);
@@ -670,7 +670,7 @@ function EditSht({ev,onClose,onSave,names,U}){
         {/* 담당 */}
         <FRow icon="person">
           <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
-            {Object.entries(U).filter(([id])=>id!=='partner').map(([id,info])=>(
+            {Object.entries(U).map(([id,info])=>(
               <button key={id} onClick={()=>setU(id)} style={{padding:'5px 13px',borderRadius:20,background:u===id?info.color:info.light,color:u===id?'#fff':info.color,fontSize:12,fontWeight:600,transition:'all .15s'}}>
                 {id==='both'?'함께 🤝':(names?.[id]||info.name)}
               </button>
