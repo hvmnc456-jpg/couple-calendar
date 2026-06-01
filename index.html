@@ -269,8 +269,7 @@ function CalTab({evs,addEv,delEv,updateEv,coupleStart,annList,names,U,holidays={
 
           /* 이 주에 걸치는 연일 일정 */
           const wBars=evs.filter(e=>e.ed&&e.ed!==e.dt&&e.dt<=wEnd&&e.ed>=wStart);
-          const hasHolInWeek=wDates.some(d=>d&&holidays[d]);
-          const cellH=(hasHolInWeek?54:44)+wBars.length*13;
+          const cellH=44+wBars.length*13;
 
           return(
             <div key={w} style={{position:'relative',marginBottom:2}}>
@@ -292,7 +291,6 @@ function CalTab({evs,addEv,delEv,updateEv,coupleStart,annList,names,U,holidays={
                         color:isSel?'#fff':isTod?V.pri:(isHol||col===0)?'#FF453A':col===6?'#5E8EE0':V.oS}}>
                         {day}
                       </span>
-                      {isHol&&<span style={{fontSize:6.5,fontWeight:600,color:isSel?'rgba(255,255,255,.85)':'#FF453A',lineHeight:1,marginTop:1,maxWidth:'95%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',letterSpacing:.1}}>{(holidays[dateStr]||'').slice(0,4)}</span>}
                       {sDEvs.length>0&&(
                         <div style={{marginTop:2,fontSize:7.5,fontWeight:600,
                           background:isSel?'rgba(255,255,255,.22)':U[sDEvs[0].u]?.light||'rgba(155,114,200,.12)',
