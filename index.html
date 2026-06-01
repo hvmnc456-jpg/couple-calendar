@@ -1703,11 +1703,11 @@ function BTBar({active,setActive}){
     {id:'profile',     ic:'person',        lb:'더보기'},
   ];
   return(
-    <div style={{position:'fixed',bottom:0,left:0,right:0,height:56,paddingBottom:0,boxSizing:'content-box',background:V.surf,borderTop:`1px solid ${V.ol}`,display:'flex',justifyContent:'space-around',alignItems:'flex-start',zIndex:100}}>
+    <div style={{position:'fixed',bottom:0,left:0,right:0,height:60,paddingBottom:0,boxSizing:'content-box',background:V.surf,borderTop:`1px solid ${V.ol}`,display:'flex',justifyContent:'space-around',alignItems:'flex-end',zIndex:100}}>
       {tabs.map(t=>{
         const on=t.id===active;
         return(
-          <button key={t.id} onClick={()=>setActive(t.id)} style={{flex:1,height:56,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,padding:'2px 6px',minWidth:0}}>
+          <button key={t.id} onClick={()=>setActive(t.id)} style={{flex:1,height:60,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',gap:3,paddingTop:2,paddingBottom:6,paddingLeft:6,paddingRight:6,minWidth:0}}>
             <div style={{width:62,height:32,borderRadius:16,background:on?V.pC:'transparent',display:'flex',alignItems:'center',justifyContent:'center',transition:'background .2s'}}>
               <span className="material-symbols-outlined" style={{fontSize:22,color:on?V.tOn:V.tOff,transition:'color .2s',fontVariationSettings:on?"'FILL' 1, 'wght' 600":"'FILL' 0, 'wght' 400"}}>{t.ic}</span>
             </div>
@@ -2172,7 +2172,7 @@ function App(){
         {tab==='bucket'      &&<BkTab items={bkItems} onToggle={toggleBkItem} onAdd={addBkItem} onDel={delBkItem} allCats={allBucketCats} addCustomCat={addCustomCat} customCats={customCats} delCustomCat={deleteCat}/>}
         {tab==='profile'     &&<ProfTab names={names} setNames={saveNames} coupleStart={coupleStart} setCoupleStart={saveCoupleStart} birthdays={birthdays} setBirthdays={saveBirthdays} partnerUid={partnerUid} coupleId={coupleId} myUid={myUid} onSwitchCouple={id=>setCoupleId(id)} myGender={myGender} partnerGender={partnerGender} saveGender={saveGender} onReset={handleReset} calName={calName} saveCalName={saveCalName}/>}
       </div>
-      <div style={{height:'56px',flexShrink:0}}/>
+      <div style={{height:'60px',flexShrink:0}}/>
       <BTBar active={tab} setActive={setTab}/>
     </div>
   );

@@ -1,6 +1,6 @@
 // __BUILD__ 값은 배포 스크립트가 매 배포마다 타임스탬프로 치환함
 // → sw.js 바이트가 달라져 브라우저가 새 SW를 감지/설치 (skipWaiting + clients.claim으로 즉시 교체)
-const BUILD = '1780304380473';
+const BUILD = '1780304551024';
 const CACHE = 'couple-calendar-' + BUILD;
 const STATIC = ['/manifest.json', '/icons/icon.svg', '/icons/icon-maskable.svg'];
 
