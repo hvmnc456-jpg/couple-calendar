@@ -1737,18 +1737,37 @@ function loadKakao(){
 }
 
 /* ── 카카오 장소 검색 입력 ── */
-function PlacePicker({value,onChange,onPick,placeholder}){
-  const [open,setOpen]=useState(false);
+/* ── 장소 선택 입력 (돋보기 → 검색 모달) ── */
+function PlacePicker({value,address,onPick,placeholder}){
+  const [search,setSearch]=useState(false);
+  return(
+    <div style={{flex:1}}>
+      <div onClick={()=>setSearch(true)} style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}>
+        <div style={{flex:1,fontSize:15,color:value?V.oS:V.tOff,fontWeight:value?500:400,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{value||placeholder}</div>
+        <button onClick={e=>{e.stopPropagation();setSearch(true);}} style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,background:V.pC,color:V.pri}}>
+          <span className="material-symbols-outlined" style={{fontSize:18}}>search</span>
+        </button>
+      </div>
+      {address&&<div style={{fontSize:12,color:V.oSV,marginTop:3}}>📍 {address}</div>}
+      {search&&<PlaceSearchModal initial={value} onClose={()=>setSearch(false)} onSelect={p=>{onPick(p);setSearch(false);}}/>}
+    </div>
+  );
+}
+
+/* ── 카카오 장소 검색 모달 (검색 + 지도 미리보기) ── */
+function PlaceSearchModal({initial,onClose,onSelect}){
+  const [q,setQ]=useState(initial||'');
   const [results,setResults]=useState([]);
-  const [msg,setMsg]=useState('');
-  const [picked,setPicked]=useState(false);
+  const [msg,setMsg]=useState('장소명을 검색해보세요');
+  const [sel,setSel]=useState(null);
   const psRef=useRef(null);
-  function runSearch(q){
-    if(!q){setResults([]);setOpen(false);setMsg('');return;}
-    setMsg('검색 중…');setOpen(true);setResults([]);
+  const mapRef=useRef(null), mapObj=useRef(null), mk=useRef(null);
+  function doSearch(){
+    const kw=q.trim(); if(!kw){setMsg('검색어를 입력하세요');return;}
+    setMsg('검색 중…');setResults([]);setSel(null);
     loadKakao().then(()=>{
       if(!psRef.current) psRef.current=new window.kakao.maps.services.Places();
-      psRef.current.keywordSearch(q,(data,status)=>{
+      psRef.current.keywordSearch(kw,(data,status)=>{
         const S=window.kakao.maps.services.Status;
         if(status===S.OK){setResults(data);setMsg('');}
         else if(status===S.ZERO_RESULT){setResults([]);setMsg('검색 결과가 없어요');}
@@ -1756,39 +1775,77 @@ function PlacePicker({value,onChange,onPick,placeholder}){
       });
     }).catch(()=>{setResults([]);setMsg('지도 로딩 실패 (도메인 등록 확인)');});
   }
-  // 입력 시 자동 검색 (디바운스 350ms)
   useEffect(()=>{
-    if(picked) return;
-    const q=(value||'').trim();
-    if(q.length<2){setResults([]);setOpen(false);setMsg('');return;}
-    const t=setTimeout(()=>runSearch(q),350);
-    return()=>clearTimeout(t);
-  },[value,picked]);
-  function pick(p){
-    setPicked(true);
-    onPick({name:p.place_name,address:p.road_address_name||p.address_name||'',x:p.x,y:p.y});
-    setOpen(false);setResults([]);setMsg('');
-  }
+    if(!sel) return;
+    loadKakao().then(()=>{
+      const pos=new window.kakao.maps.LatLng(+sel.y,+sel.x);
+      if(!mapObj.current){
+        mapObj.current=new window.kakao.maps.Map(mapRef.current,{center:pos,level:3});
+        mk.current=new window.kakao.maps.Marker({position:pos});mk.current.setMap(mapObj.current);
+      }else{mk.current.setPosition(pos);}
+      setTimeout(()=>{mapObj.current.relayout();mapObj.current.setCenter(pos);},80);
+    });
+  },[sel]);
   return(
-    <div style={{flex:1,position:'relative'}}>
-      <div style={{display:'flex',alignItems:'center',gap:6}}>
-        <input value={value} onChange={e=>{setPicked(false);onChange(e.target.value);}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();runSearch((value||'').trim());}}} placeholder={placeholder} style={{flex:1,fontSize:15,color:V.oS}}/>
-        <button onClick={()=>runSearch((value||'').trim())} style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,background:V.pC,color:V.pri}}>
-          <span className="material-symbols-outlined" style={{fontSize:18}}>search</span>
-        </button>
-      </div>
-      {open&&(
-        <div style={{marginTop:8,border:`1px solid ${V.ol}`,borderRadius:12,background:V.surf,maxHeight:210,overflowY:'auto',boxShadow:'0 4px 16px rgba(0,0,0,.08)'}}>
-          {msg&&<div style={{padding:'12px 14px',fontSize:13,color:V.oSV}}>{msg}</div>}
+    <div className="ovl" onClick={onClose}>
+      <div className="sht" style={{background:V.surf,padding:'12px 18px 32px',maxHeight:'90%'}} onClick={e=>e.stopPropagation()}>
+        <div style={{width:38,height:4,borderRadius:2,background:'rgba(0,0,0,.1)',margin:'0 auto 16px'}}/>
+        <div style={{fontSize:17,fontWeight:600,color:V.oS,marginBottom:14,letterSpacing:-.3}}>장소 검색</div>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+          <input value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();doSearch();}}} placeholder="장소·주소 검색 (예: 한라산)" autoFocus style={{flex:1,fontSize:15,color:V.oS,background:V.sC,borderRadius:10,padding:'11px 13px'}}/>
+          <button onClick={doSearch} style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:44,height:42,borderRadius:10,background:V.pri,color:'#fff'}}>
+            <span className="material-symbols-outlined" style={{fontSize:20}}>search</span>
+          </button>
+        </div>
+
+        {sel&&(
+          <div style={{marginBottom:14}}>
+            <div ref={mapRef} style={{width:'100%',height:190,borderRadius:12,overflow:'hidden',border:`1px solid ${V.ol}`,background:V.sC}}/>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginTop:10}}>
+              <div style={{minWidth:0}}>
+                <div style={{fontSize:14.5,fontWeight:700,color:V.oS,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{sel.place_name}</div>
+                <div style={{fontSize:12,color:V.oSV,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{sel.road_address_name||sel.address_name}</div>
+              </div>
+              <button onClick={()=>onSelect({name:sel.place_name,address:sel.road_address_name||sel.address_name||'',x:sel.x,y:sel.y})} style={{flexShrink:0,padding:'10px 16px',borderRadius:12,background:V.pri,color:'#fff',fontSize:13.5,fontWeight:600}}>이 장소로 선택</button>
+            </div>
+          </div>
+        )}
+
+        <div style={{maxHeight:sel?180:300,overflowY:'auto'}}>
+          {msg&&<div style={{padding:'14px 4px',fontSize:13,color:V.oSV}}>{msg}</div>}
           {results.map(p=>(
-            <div key={p.id} onClick={()=>pick(p)} style={{padding:'10px 14px',borderBottom:`1px solid ${V.ol}`,cursor:'pointer'}}>
+            <div key={p.id} onClick={()=>setSel(p)} style={{padding:'11px 6px',borderBottom:`1px solid ${V.ol}`,cursor:'pointer',background:sel&&sel.id===p.id?V.pC:'transparent',borderRadius:6}}>
               <div style={{fontSize:14,fontWeight:600,color:V.oS}}>{p.place_name}</div>
               <div style={{fontSize:12,color:V.oSV,marginTop:2}}>{p.road_address_name||p.address_name}</div>
               {p.category_name&&<div style={{fontSize:11,color:V.tOff,marginTop:1}}>{p.category_name}</div>}
             </div>
           ))}
         </div>
-      )}
+      </div>
+    </div>
+  );
+}
+
+/* ── 지도 보기 모달 (저장된 장소 위치 확인) ── */
+function MapViewModal({place,address,x,y,onClose}){
+  const mapRef=useRef(null);
+  useEffect(()=>{
+    loadKakao().then(()=>{
+      const pos=new window.kakao.maps.LatLng(+y,+x);
+      const map=new window.kakao.maps.Map(mapRef.current,{center:pos,level:3});
+      const marker=new window.kakao.maps.Marker({position:pos});marker.setMap(map);
+      setTimeout(()=>{map.relayout();map.setCenter(pos);},80);
+    }).catch(()=>{});
+  },[]);
+  return(
+    <div className="ovl" onClick={onClose}>
+      <div className="sht" style={{background:V.surf,padding:'12px 18px 32px',maxHeight:'90%'}} onClick={e=>e.stopPropagation()}>
+        <div style={{width:38,height:4,borderRadius:2,background:'rgba(0,0,0,.1)',margin:'0 auto 16px'}}/>
+        <div style={{fontSize:17,fontWeight:700,color:V.oS,letterSpacing:-.3}}>{place}</div>
+        {address&&<div style={{fontSize:12.5,color:V.oSV,marginTop:3,marginBottom:12}}>📍 {address}</div>}
+        <div ref={mapRef} style={{width:'100%',height:300,borderRadius:14,overflow:'hidden',border:`1px solid ${V.ol}`,background:V.sC,marginTop:address?0:12}}/>
+        <a href={`https://map.kakao.com/link/map/${encodeURIComponent(place)},${y},${x}`} target="_blank" rel="noreferrer" style={{display:'block',textAlign:'center',marginTop:14,padding:13,borderRadius:14,background:V.pC,color:V.pri,fontSize:14,fontWeight:600,textDecoration:'none'}}>카카오맵 앱에서 길찾기 →</a>
+      </div>
     </div>
   );
 }
@@ -1880,7 +1937,7 @@ function TripAddSht({onClose,onAdd}){
           <input value={ti} onChange={e=>setTi(e.target.value)} placeholder="여행 제목 (예: 제주도 여행)" style={{fontSize:15,color:V.oS,fontWeight:500}} autoFocus/>
         </FRow>
         <FRow icon="place" top>
-          <PlacePicker value={dest} onChange={setDest} onPick={p=>setDest(p.name)} placeholder="여행지 검색 (예: 제주도, 부산)"/>
+          <PlacePicker value={dest} onPick={p=>setDest(p.name)} placeholder="여행지 검색 (예: 제주도, 부산)"/>
         </FRow>
         <FRow icon="calendar_today" top>
           <div style={{flex:1}}>
@@ -1903,6 +1960,7 @@ function TravelDetail({trip,onBack,onAddPlan,onDelPlan,onDelTrip}){
   const days=travDays(trip.sd,trip.ed);
   const [dayIdx,setDayIdx]=useState(0);
   const [addPlan,setAddPlan]=useState(false);
+  const [mapPlan,setMapPlan]=useState(null);
   const curDate=days[dayIdx]||trip.sd;
   const list=[...(trip.plans?.[curDate]||[])].sort((a,b)=>(a.time||'').localeCompare(b.time||''));
   const wd=['일','월','화','수','목','금','토'];
@@ -1955,7 +2013,7 @@ function TravelDetail({trip,onBack,onAddPlan,onDelPlan,onDelTrip}){
               {p.place&&(
                 <div style={{marginTop:3}}>
                   {p.px&&p.py
-                    ?<a href={`https://map.kakao.com/link/map/${encodeURIComponent(p.place)},${p.py},${p.px}`} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{fontSize:12.5,color:V.pri,display:'inline-flex',alignItems:'center',gap:3,textDecoration:'none'}}><span className="material-symbols-outlined" style={{fontSize:14}}>place</span>{p.place}</a>
+                    ?<button onClick={()=>setMapPlan(p)} style={{fontSize:12.5,color:V.pri,display:'inline-flex',alignItems:'center',gap:3,fontWeight:600}}><span className="material-symbols-outlined" style={{fontSize:14}}>place</span>{p.place}<span className="material-symbols-outlined" style={{fontSize:13}}>map</span></button>
                     :<div style={{fontSize:12.5,color:V.oSV,display:'flex',alignItems:'center',gap:3}}><span className="material-symbols-outlined" style={{fontSize:14}}>place</span>{p.place}</div>}
                   {p.placeAddr&&<div style={{fontSize:11.5,color:V.tOff,marginTop:1,paddingLeft:17}}>{p.placeAddr}</div>}
                 </div>
@@ -1971,6 +2029,7 @@ function TravelDetail({trip,onBack,onAddPlan,onDelPlan,onDelTrip}){
       </div>
 
       {addPlan&&<PlanAddSht dayLabel={`Day ${dayIdx+1}`} onClose={()=>setAddPlan(false)} onAdd={item=>{onAddPlan(curDate,item);setAddPlan(false);}}/>}
+      {mapPlan&&<MapViewModal place={mapPlan.place} address={mapPlan.placeAddr} x={mapPlan.px} y={mapPlan.py} onClose={()=>setMapPlan(null)}/>}
     </div>
   );
 }
@@ -1996,9 +2055,8 @@ function PlanAddSht({dayLabel,onClose,onAdd}){
           <input value={ti} onChange={e=>setTi(e.target.value)} placeholder="일정 내용 (예: 한라산 등반)" style={{fontSize:15,color:V.oS,fontWeight:500}} autoFocus/>
         </FRow>
         <FRow icon="place" top>
-          <PlacePicker value={place} onChange={v=>{setPlace(v);setPlaceAddr('');}} onPick={p=>{setPlace(p.name);setPlaceAddr(p.address);setPx(p.x);setPy(p.y);}} placeholder="장소 검색 (예: 한라산, 광안리해수욕장)"/>
+          <PlacePicker value={place} address={placeAddr} onPick={p=>{setPlace(p.name);setPlaceAddr(p.address);setPx(p.x);setPy(p.y);}} placeholder="장소 검색 (예: 한라산, 광안리해수욕장)"/>
         </FRow>
-        {placeAddr&&<div style={{fontSize:12,color:V.oSV,padding:'0 0 4px 31px',marginTop:-4}}>📍 {placeAddr}</div>}
         <FRow icon="notes" top>
           <textarea value={memo} onChange={e=>setMemo(e.target.value)} placeholder="메모 (선택)" rows={2} style={{fontSize:14,color:V.oS}}/>
         </FRow>
