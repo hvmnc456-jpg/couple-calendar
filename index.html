@@ -1703,7 +1703,7 @@ function BTBar({active,setActive}){
     {id:'profile',     ic:'person',        lb:'더보기'},
   ];
   return(
-    <div style={{position:'fixed',bottom:0,left:0,right:0,height:60,paddingBottom:'env(safe-area-inset-bottom)',boxSizing:'content-box',background:V.surf,borderTop:`1px solid ${V.ol}`,display:'flex',justifyContent:'space-around',alignItems:'flex-end',zIndex:100}}>
+    <div style={{position:'fixed',bottom:0,left:0,right:0,height:60,paddingBottom:0,boxSizing:'content-box',background:V.surf,borderTop:`1px solid ${V.ol}`,display:'flex',justifyContent:'space-around',alignItems:'flex-end',zIndex:100}}>
       {tabs.map(t=>{
         const on=t.id===active;
         return(
