@@ -1695,14 +1695,236 @@ function ProfTab({names:initNames,setNames,coupleStart,setCoupleStart,birthdays:
 /* ═══════════════════════════════════════
    BOTTOM TAB BAR
 ══════════════════════════════════════ */
+/* ═══════════════════════════════════════
+   TRAVEL TAB (UI 프리뷰 — 로컬 상태)
+══════════════════════════════════════ */
+function travDays(sd,ed){
+  // sd~ed 사이 날짜 문자열 배열
+  const out=[];
+  if(!sd) return out;
+  const [sy,sm,sdd]=sd.split('-').map(Number);
+  const end=ed||sd;
+  const [ey,em,edd]=end.split('-').map(Number);
+  let cur=new Date(sy,sm-1,sdd), last=new Date(ey,em-1,edd);
+  while(cur<=last){
+    const y=cur.getFullYear(),m=String(cur.getMonth()+1).padStart(2,'0'),d=String(cur.getDate()).padStart(2,'0');
+    out.push(`${y}-${m}-${d}`);
+    cur.setDate(cur.getDate()+1);
+  }
+  return out;
+}
+function fmtTrip(sd,ed){
+  if(!sd) return '';
+  const f=s=>{const[,m,d]=s.split('-');return `${+m}.${+d}`;};
+  return ed&&ed!==sd?`${f(sd)} ~ ${f(ed)}`:f(sd);
+}
+
 function TravelTab(){
+  const [trips,setTrips]=useState([]);   // {id,ti,dest,sd,ed,plans:{date:[{id,time,ti,place,memo}]}}
+  const [openId,setOpenId]=useState(null);
+  const [addTrip,setAddTrip]=useState(false);
+
+  const trip=trips.find(t=>t.id===openId)||null;
+
+  function createTrip(t){
+    const id='tr'+Date.now();
+    setTrips(p=>[...p,{...t,id,plans:{}}]);
+    setAddTrip(false);
+    setOpenId(id);
+  }
+  function delTrip(id){
+    setTrips(p=>p.filter(t=>t.id!==id));
+    setOpenId(null);
+  }
+  function addPlan(date,item){
+    setTrips(p=>p.map(t=>{
+      if(t.id!==openId) return t;
+      const list=t.plans[date]||[];
+      return {...t,plans:{...t.plans,[date]:[...list,{...item,id:'pl'+Date.now()}]}};
+    }));
+  }
+  function delPlan(date,pid){
+    setTrips(p=>p.map(t=>{
+      if(t.id!==openId) return t;
+      return {...t,plans:{...t.plans,[date]:(t.plans[date]||[]).filter(x=>x.id!==pid)}};
+    }));
+  }
+
+  if(trip) return <TravelDetail trip={trip} onBack={()=>setOpenId(null)} onAddPlan={addPlan} onDelPlan={delPlan} onDelTrip={delTrip}/>;
+
   return(
-    <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:14,background:V.bg}}>
-      <div style={{width:64,height:64,borderRadius:'50%',background:V.pC,display:'flex',alignItems:'center',justifyContent:'center'}}>
-        <span className="material-symbols-outlined" style={{fontSize:32,color:V.pri}}>flight</span>
+    <div style={{flex:1,overflowY:'auto',background:V.bg}}>
+      <div style={{padding:'18px 18px 8px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div style={{fontSize:22,fontWeight:700,color:V.oS,letterSpacing:-.5}}>우리 여행 ✈️</div>
+        <button onClick={()=>setAddTrip(true)} style={{display:'flex',alignItems:'center',gap:4,padding:'7px 13px',borderRadius:20,background:V.pri,color:'#fff',fontSize:13,fontWeight:600}}>
+          <span className="material-symbols-outlined" style={{fontSize:17}}>add</span>여행 추가
+        </button>
       </div>
-      <div style={{fontSize:16,color:V.oSV,fontWeight:600}}>준비중이에요</div>
-      <div style={{fontSize:13,color:V.tOff}}>여행 기능을 준비하고 있어요 ✈️</div>
+
+      {trips.length===0?(
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:12,padding:'80px 20px'}}>
+          <div style={{width:64,height:64,borderRadius:'50%',background:V.pC,display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <span className="material-symbols-outlined" style={{fontSize:32,color:V.pri}}>luggage</span>
+          </div>
+          <div style={{fontSize:15,color:V.oSV,fontWeight:600}}>아직 등록된 여행이 없어요</div>
+          <div style={{fontSize:13,color:V.tOff,textAlign:'center'}}>둘이 떠날 여행을 추가하고<br/>날짜별 계획표를 만들어보세요</div>
+        </div>
+      ):(
+        <div style={{padding:'8px 16px 20px'}}>
+          {trips.map(t=>{
+            const days=travDays(t.sd,t.ed).length;
+            const cnt=Object.values(t.plans).reduce((a,l)=>a+l.length,0);
+            return(
+              <div key={t.id} onClick={()=>setOpenId(t.id)} style={{background:V.surf,borderRadius:16,padding:'15px 16px',marginBottom:11,border:`1px solid ${V.ol}`,boxShadow:'0 2px 8px rgba(0,0,0,.04)',cursor:'pointer'}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+                  <span className="material-symbols-outlined" style={{fontSize:20,color:V.pri}}>place</span>
+                  <span style={{fontSize:16,fontWeight:700,color:V.oS,letterSpacing:-.3}}>{t.ti}</span>
+                </div>
+                {t.dest&&<div style={{fontSize:13,color:V.oSV,marginBottom:6,paddingLeft:28}}>{t.dest}</div>}
+                <div style={{display:'flex',alignItems:'center',gap:10,paddingLeft:28}}>
+                  <span style={{fontSize:12.5,color:V.oSV,display:'flex',alignItems:'center',gap:4}}><span className="material-symbols-outlined" style={{fontSize:15}}>calendar_today</span>{fmtTrip(t.sd,t.ed)}</span>
+                  <span style={{fontSize:12.5,color:V.tOff}}>{days}일 · 일정 {cnt}개</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {addTrip&&<TripAddSht onClose={()=>setAddTrip(false)} onAdd={createTrip}/>}
+    </div>
+  );
+}
+
+function TripAddSht({onClose,onAdd}){
+  const [ti,setTi]=useState('');
+  const [dest,setDest]=useState('');
+  const [sd,setSd]=useState(TODAY_STR);
+  const [ed,setEd]=useState(TODAY_STR);
+  const [picker,setPicker]=useState(null);
+  function submit(){ if(!ti.trim())return; onAdd({ti:ti.trim(),dest:dest.trim(),sd,ed}); }
+  return(
+    <div className="ovl" onClick={onClose}>
+      <div className="sht" style={{background:V.surf,padding:'12px 20px 44px'}} onClick={e=>e.stopPropagation()}>
+        <div style={{width:38,height:4,borderRadius:2,background:'rgba(0,0,0,.1)',margin:'0 auto 18px'}}/>
+        <div style={{fontSize:17,fontWeight:600,color:V.oS,marginBottom:16,letterSpacing:-.3}}>새 여행</div>
+        <FRow icon="title">
+          <input value={ti} onChange={e=>setTi(e.target.value)} placeholder="여행 제목 (예: 제주도 여행)" style={{fontSize:15,color:V.oS,fontWeight:500}} autoFocus/>
+        </FRow>
+        <FRow icon="place">
+          <input value={dest} onChange={e=>setDest(e.target.value)} placeholder="여행지 (선택)" style={{fontSize:15,color:V.oS}}/>
+        </FRow>
+        <FRow icon="calendar_today" top>
+          <div style={{flex:1}}>
+            <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <DateTab label="시작일" value={sd} active={picker==='start'} onClick={()=>setPicker(p=>p==='start'?null:'start')}/>
+              <span style={{fontSize:16,color:V.oSV,flexShrink:0}}>~</span>
+              <DateTab label="종료일" value={ed} active={picker==='end'} onClick={()=>setPicker(p=>p==='end'?null:'end')}/>
+            </div>
+            {picker==='start'&&<CalPicker value={sd} onSelect={v=>{setSd(v);if(v>ed)setEd(v);setPicker('end');}}/>}
+            {picker==='end'&&<CalPicker value={ed} min={sd} onSelect={v=>{setEd(v);setPicker(null);}}/>}
+          </div>
+        </FRow>
+        <button onClick={submit} style={{width:'100%',padding:14,borderRadius:14,background:ti.trim()?V.pri:'rgba(0,0,0,.08)',color:ti.trim()?'#fff':V.oSV,fontSize:15,fontWeight:600,marginTop:18,transition:'background .2s,color .2s',letterSpacing:-.1}}>여행 만들기</button>
+      </div>
+    </div>
+  );
+}
+
+function TravelDetail({trip,onBack,onAddPlan,onDelPlan,onDelTrip}){
+  const days=travDays(trip.sd,trip.ed);
+  const [dayIdx,setDayIdx]=useState(0);
+  const [addPlan,setAddPlan]=useState(false);
+  const curDate=days[dayIdx]||trip.sd;
+  const list=[...(trip.plans[curDate]||[])].sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+  const wd=['일','월','화','수','목','금','토'];
+  function dLabel(s){const[y,m,d]=s.split('-').map(Number);const dt=new Date(y,m-1,d);return `${m}.${d}(${wd[dt.getDay()]})`;}
+
+  return(
+    <div style={{flex:1,overflowY:'auto',background:V.bg}}>
+      {/* 헤더 */}
+      <div style={{padding:'14px 16px 10px',background:V.surf,borderBottom:`1px solid ${V.ol}`}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <button onClick={onBack} style={{display:'flex',alignItems:'center',gap:2,color:V.oSV,fontSize:14}}>
+            <span className="material-symbols-outlined" style={{fontSize:22}}>chevron_left</span>목록
+          </button>
+          <button onClick={()=>{if(confirm('이 여행을 삭제할까요?'))onDelTrip(trip.id);}} style={{color:V.tOff}}>
+            <span className="material-symbols-outlined" style={{fontSize:20}}>delete</span>
+          </button>
+        </div>
+        <div style={{fontSize:20,fontWeight:700,color:V.oS,marginTop:6,letterSpacing:-.4}}>{trip.ti}</div>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginTop:3,fontSize:13,color:V.oSV}}>
+          {trip.dest&&<span>{trip.dest}</span>}
+          <span>· {fmtTrip(trip.sd,trip.ed)}</span>
+        </div>
+      </div>
+
+      {/* Day 탭 */}
+      <div style={{display:'flex',gap:8,overflowX:'auto',padding:'12px 16px',scrollbarWidth:'none'}}>
+        {days.map((d,i)=>(
+          <button key={d} onClick={()=>setDayIdx(i)} style={{flexShrink:0,display:'flex',flexDirection:'column',alignItems:'center',gap:2,padding:'8px 14px',borderRadius:14,background:i===dayIdx?V.pri:V.surf,border:`1px solid ${i===dayIdx?V.pri:V.ol}`,transition:'all .15s'}}>
+            <span style={{fontSize:12,fontWeight:700,color:i===dayIdx?'#fff':V.oS}}>Day {i+1}</span>
+            <span style={{fontSize:10.5,color:i===dayIdx?'rgba(255,255,255,.85)':V.tOff}}>{dLabel(d)}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* 계획표 */}
+      <div style={{padding:'4px 16px 20px'}}>
+        {list.length===0?(
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:'50px 0'}}>
+            <span className="material-symbols-outlined" style={{fontSize:36,color:V.tOff}}>event_note</span>
+            <div style={{fontSize:13.5,color:V.tOff}}>Day {dayIdx+1} 일정을 추가해보세요</div>
+          </div>
+        ):list.map(p=>(
+          <div key={p.id} style={{display:'flex',gap:12,marginBottom:11}}>
+            <div style={{flexShrink:0,width:46,textAlign:'right',fontSize:13,fontWeight:700,color:V.pri,paddingTop:13}}>{p.time||'—'}</div>
+            <div style={{flex:1,background:V.surf,borderRadius:14,padding:'12px 14px',border:`1px solid ${V.ol}`,boxShadow:'0 1px 4px rgba(0,0,0,.04)'}}>
+              <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:8}}>
+                <div style={{fontSize:14.5,fontWeight:600,color:V.oS}}>{p.ti}</div>
+                <button onClick={()=>onDelPlan(curDate,p.id)} style={{color:V.tOff,flexShrink:0,marginTop:1}}><span className="material-symbols-outlined" style={{fontSize:17}}>close</span></button>
+              </div>
+              {p.place&&<div style={{fontSize:12.5,color:V.oSV,marginTop:3,display:'flex',alignItems:'center',gap:3}}><span className="material-symbols-outlined" style={{fontSize:14}}>place</span>{p.place}</div>}
+              {p.memo&&<div style={{fontSize:12.5,color:V.oSV,marginTop:4}}>{p.memo}</div>}
+            </div>
+          </div>
+        ))}
+
+        <button onClick={()=>setAddPlan(true)} style={{width:'100%',padding:13,borderRadius:14,border:`1.5px dashed ${V.ol}`,background:'transparent',color:V.pri,fontSize:14,fontWeight:600,display:'flex',alignItems:'center',justifyContent:'center',gap:5,marginTop:6}}>
+          <span className="material-symbols-outlined" style={{fontSize:18}}>add</span>일정 추가
+        </button>
+      </div>
+
+      {addPlan&&<PlanAddSht dayLabel={`Day ${dayIdx+1}`} onClose={()=>setAddPlan(false)} onAdd={item=>{onAddPlan(curDate,item);setAddPlan(false);}}/>}
+    </div>
+  );
+}
+
+function PlanAddSht({dayLabel,onClose,onAdd}){
+  const [time,setTime]=useState('');
+  const [ti,setTi]=useState('');
+  const [place,setPlace]=useState('');
+  const [memo,setMemo]=useState('');
+  function submit(){ if(!ti.trim())return; onAdd({time,ti:ti.trim(),place:place.trim(),memo:memo.trim()}); }
+  return(
+    <div className="ovl" onClick={onClose}>
+      <div className="sht" style={{background:V.surf,padding:'12px 20px 44px'}} onClick={e=>e.stopPropagation()}>
+        <div style={{width:38,height:4,borderRadius:2,background:'rgba(0,0,0,.1)',margin:'0 auto 18px'}}/>
+        <div style={{fontSize:17,fontWeight:600,color:V.oS,marginBottom:16,letterSpacing:-.3}}>{dayLabel} 일정</div>
+        <FRow icon="schedule">
+          <input type="time" value={time} onChange={e=>setTime(e.target.value)} style={{fontSize:14,color:V.oS,flex:1}}/>
+        </FRow>
+        <FRow icon="title">
+          <input value={ti} onChange={e=>setTi(e.target.value)} placeholder="일정 내용 (예: 한라산 등반)" style={{fontSize:15,color:V.oS,fontWeight:500}} autoFocus/>
+        </FRow>
+        <FRow icon="place">
+          <input value={place} onChange={e=>setPlace(e.target.value)} placeholder="장소 (선택)" style={{fontSize:15,color:V.oS}}/>
+        </FRow>
+        <FRow icon="notes" top>
+          <textarea value={memo} onChange={e=>setMemo(e.target.value)} placeholder="메모 (선택)" rows={2} style={{fontSize:14,color:V.oS}}/>
+        </FRow>
+        <button onClick={submit} style={{width:'100%',padding:14,borderRadius:14,background:ti.trim()?V.pri:'rgba(0,0,0,.08)',color:ti.trim()?'#fff':V.oSV,fontSize:15,fontWeight:600,marginTop:18,transition:'background .2s,color .2s',letterSpacing:-.1}}>추가하기</button>
+      </div>
     </div>
   );
 }
