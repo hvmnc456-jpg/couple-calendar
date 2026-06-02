@@ -1719,43 +1719,29 @@ function fmtTrip(sd,ed){
   return ed&&ed!==sd?`${f(sd)} ~ ${f(ed)}`:f(sd);
 }
 
-const TRAVEL_LS='_travel_trips_v1';
-function TravelTab(){
-  // 로컬 영구 저장 (탭 전환 시 언마운트돼도 유지). Firestore 연동 전 임시.
-  const [trips,setTrips]=useState(()=>{
-    try{ return JSON.parse(localStorage.getItem(TRAVEL_LS))||[]; }catch(e){ return []; }
-  });
+function TravelTab({trips=[],onAddTrip,onDelTrip,onUpdatePlans}){
   const [openId,setOpenId]=useState(null);
   const [addTrip,setAddTrip]=useState(false);
-
-  useEffect(()=>{
-    try{ localStorage.setItem(TRAVEL_LS,JSON.stringify(trips)); }catch(e){}
-  },[trips]);
 
   const trip=trips.find(t=>t.id===openId)||null;
 
   function createTrip(t){
-    const id='tr'+Date.now();
-    setTrips(p=>[...p,{...t,id,plans:{}}]);
+    onAddTrip(t);
     setAddTrip(false);
-    setOpenId(id);
+    setOpenId(null); // 목록으로 돌아가 새 여행이 실시간으로 뜨면 탭
   }
   function delTrip(id){
-    setTrips(p=>p.filter(t=>t.id!==id));
+    onDelTrip(id);
     setOpenId(null);
   }
   function addPlan(date,item){
-    setTrips(p=>p.map(t=>{
-      if(t.id!==openId) return t;
-      const list=t.plans[date]||[];
-      return {...t,plans:{...t.plans,[date]:[...list,{...item,id:'pl'+Date.now()}]}};
-    }));
+    if(!trip) return;
+    const list=trip.plans?.[date]||[];
+    onUpdatePlans(trip.id,{...(trip.plans||{}),[date]:[...list,{...item,id:'pl'+Date.now()}]});
   }
   function delPlan(date,pid){
-    setTrips(p=>p.map(t=>{
-      if(t.id!==openId) return t;
-      return {...t,plans:{...t.plans,[date]:(t.plans[date]||[]).filter(x=>x.id!==pid)}};
-    }));
+    if(!trip) return;
+    onUpdatePlans(trip.id,{...(trip.plans||{}),[date]:(trip.plans?.[date]||[]).filter(x=>x.id!==pid)});
   }
 
   if(trip) return <TravelDetail trip={trip} onBack={()=>setOpenId(null)} onAddPlan={addPlan} onDelPlan={delPlan} onDelTrip={delTrip}/>;
@@ -1781,7 +1767,7 @@ function TravelTab(){
         <div style={{padding:'8px 16px 20px'}}>
           {trips.map(t=>{
             const days=travDays(t.sd,t.ed).length;
-            const cnt=Object.values(t.plans).reduce((a,l)=>a+l.length,0);
+            const cnt=Object.values(t.plans||{}).reduce((a,l)=>a+l.length,0);
             return(
               <div key={t.id} onClick={()=>setOpenId(t.id)} style={{background:V.surf,borderRadius:16,padding:'15px 16px',marginBottom:11,border:`1px solid ${V.ol}`,boxShadow:'0 2px 8px rgba(0,0,0,.04)',cursor:'pointer'}}>
                 <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
@@ -1844,7 +1830,7 @@ function TravelDetail({trip,onBack,onAddPlan,onDelPlan,onDelTrip}){
   const [dayIdx,setDayIdx]=useState(0);
   const [addPlan,setAddPlan]=useState(false);
   const curDate=days[dayIdx]||trip.sd;
-  const list=[...(trip.plans[curDate]||[])].sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+  const list=[...(trip.plans?.[curDate]||[])].sort((a,b)=>(a.time||'').localeCompare(b.time||''));
   const wd=['일','월','화','수','목','금','토'];
   function dLabel(s){const[y,m,d]=s.split('-').map(Number);const dt=new Date(y,m-1,d);return `${m}.${d}(${wd[dt.getDay()]})`;}
 
@@ -2153,6 +2139,7 @@ function App(){
   const [coupleDoc,setCoupleDoc]=useState(null);
   const [evs,setEvs]=useState([]);
   const [bkItems,setBkItems]=useState([]);
+  const [trips,setTrips]=useState([]);
   const [hasUpdate,setHasUpdate]=useState(false);
   const [holidays,setHolidays]=useState({});
   const fetchedYearsRef=useRef(new Set());
@@ -2207,7 +2194,10 @@ function App(){
     const u3=c.collection('buckets').orderBy('createdAt').onSnapshot(snap=>{
       setBkItems(snap.docs.map(d=>({id:d.id,...d.data()})));
     });
-    return()=>{u1();u2();u3();};
+    const u4=c.collection('trips').orderBy('createdAt').onSnapshot(snap=>{
+      setTrips(snap.docs.map(d=>({id:d.id,...d.data()})));
+    });
+    return()=>{u1();u2();u3();u4();};
   },[coupleId]);
 
   /* ── Firestore doc 참조 헬퍼 ── */
@@ -2378,6 +2368,20 @@ function App(){
     return cRef().collection('buckets').doc(id).delete();
   }
 
+  /* ── 여행 쓰기 (커플 공유) ── */
+  function addTrip(t){
+    sendPush('새 여행이 추가됐어요 ✈️',`${names.me}: ${t.ti}`).catch(()=>{});
+    return cRef().collection('trips').add({
+      ...t,plans:{},createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+  function delTrip(id){
+    return cRef().collection('trips').doc(id).delete();
+  }
+  function updateTripPlans(id,plans){
+    return cRef().collection('trips').doc(id).update({plans});
+  }
+
   /* ── 설정 저장 ── */
   function saveNames(n){
     const upd={[`names.${myUid}`]:n.me};
@@ -2413,7 +2417,7 @@ function App(){
         {tab==='calendar'    &&<CalTab evs={evsMapped} addEv={addEv} delEv={delEv} updateEv={updateEv} coupleStart={coupleStart} annList={annList} names={names} U={dynU} holidays={holidays} onFetchYear={fetchHolidaysYear}/>}
         {tab==='anniversary' &&<AnnTab coupleStart={coupleStart} annList={annList} names={names}/>}
         {tab==='bucket'      &&<BkTab items={bkItems} onToggle={toggleBkItem} onAdd={addBkItem} onDel={delBkItem} allCats={allBucketCats} addCustomCat={addCustomCat} customCats={customCats} delCustomCat={deleteCat}/>}
-        {tab==='travel'      &&<TravelTab/>}
+        {tab==='travel'      &&<TravelTab trips={trips} onAddTrip={addTrip} onDelTrip={delTrip} onUpdatePlans={updateTripPlans}/>}
         {tab==='profile'     &&<ProfTab names={names} setNames={saveNames} coupleStart={coupleStart} setCoupleStart={saveCoupleStart} birthdays={birthdays} setBirthdays={saveBirthdays} partnerUid={partnerUid} coupleId={coupleId} myUid={myUid} onSwitchCouple={id=>setCoupleId(id)} myGender={myGender} partnerGender={partnerGender} saveGender={saveGender} onReset={handleReset} calName={calName} saveCalName={saveCalName}/>}
       </div>
       <div style={{height:'60px',flexShrink:0}}/>
