@@ -1729,8 +1729,11 @@ function loadKakao(){
     if(window.kakao&&window.kakao.maps){return window.kakao.maps.load(()=>res());}
     const s=document.createElement('script');
     s.src='https://dapi.kakao.com/v2/maps/sdk.js?appkey='+KAKAO_APPKEY+'&libraries=services&autoload=false';
-    s.onload=()=>window.kakao.maps.load(()=>res());
-    s.onerror=()=>rej(new Error('kakao sdk load fail'));
+    s.onload=()=>{
+      if(window.kakao&&window.kakao.maps&&window.kakao.maps.load) window.kakao.maps.load(()=>res());
+      else { _kakaoP=null; rej(new Error('kakao sdk invalid')); }
+    };
+    s.onerror=()=>{ _kakaoP=null; rej(new Error('kakao sdk load fail')); }; // 실패 시 캐시 해제 → 재시도 가능
     document.head.appendChild(s);
   });
   return _kakaoP;
@@ -1773,7 +1776,7 @@ function PlaceSearchModal({initial,onClose,onSelect}){
         else if(status===S.ZERO_RESULT){setResults([]);setMsg('검색 결과가 없어요');}
         else{setResults([]);setMsg('검색에 실패했어요 (키/도메인 확인)');}
       });
-    }).catch(()=>{setResults([]);setMsg('지도 로딩 실패 (도메인 등록 확인)');});
+    }).catch(()=>{setResults([]);setMsg('지도를 불러오지 못했어요. 카카오 콘솔에서 "카카오맵" 제품 활성화 및 도메인 등록을 확인해주세요.');});
   }
   useEffect(()=>{
     if(!sel) return;
