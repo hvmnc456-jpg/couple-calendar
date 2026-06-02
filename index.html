@@ -492,6 +492,10 @@ function AddSht({sel,onClose,onAdd,names,U}){
   const [ts,setTs]=useState('12:00');
   const [te,setTe]=useState('');
   const [mm,setMm]=useState('');
+  const [pl,setPl]=useState('');
+  const [plAddr,setPlAddr]=useState('');
+  const [plX,setPlX]=useState('');
+  const [plY,setPlY]=useState('');
 
   const isRange=sd!==ed;
 
@@ -521,6 +525,7 @@ function AddSht({sel,onClose,onAdd,names,U}){
       s:isRange||aD?'':ts,
       e:isRange||aD?'':te,
       m:mm.trim(),
+      pl:pl.trim(), plAddr, plX, plY,
     });
   }
 
@@ -576,6 +581,12 @@ function AddSht({sel,onClose,onAdd,names,U}){
         </>)}
 
         {!picker&&(
+          <FRow icon="place" top>
+            <PlacePicker value={pl} address={plAddr} onPick={p=>{setPl(p.name);setPlAddr(p.address);setPlX(p.x);setPlY(p.y);}} placeholder="장소 검색 (선택)"/>
+          </FRow>
+        )}
+
+        {!picker&&(
           <FRow icon="notes" top>
             <textarea value={mm} onChange={e=>setMm(e.target.value)} placeholder="메모 (선택사항)" rows={2} style={{fontSize:14,color:V.oS}}/>
           </FRow>
@@ -588,6 +599,7 @@ function AddSht({sel,onClose,onAdd,names,U}){
 }
 
 function DetSht({ev,onClose,onDel,onEdit,names,U}){
+  const [mapOpen,setMapOpen]=useState(false);
   const u=U[ev.u]||U.me;
   const dName=ev.u==='both'?'함께':ev.u==='me'?(names?.me||u.name):(names?.partner||u.name);
   const dateVal=ev.ed&&ev.ed!==ev.dt
@@ -620,6 +632,19 @@ function DetSht({ev,onClose,onDel,onEdit,names,U}){
             </div>
           </div>
         ))}
+        {ev.pl&&(
+          <div style={{display:'flex',gap:12,alignItems:'flex-start',marginBottom:14}}>
+            <span className="material-symbols-outlined" style={{fontSize:18,color:V.oSV,flexShrink:0,marginTop:1}}>place</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:11,color:V.oSV,marginBottom:1,letterSpacing:.3}}>장소</div>
+              {ev.plX&&ev.plY
+                ?<button onClick={()=>setMapOpen(true)} style={{fontSize:14,color:V.pri,fontWeight:600,display:'inline-flex',alignItems:'center',gap:3}}>{ev.pl}<span className="material-symbols-outlined" style={{fontSize:15}}>map</span></button>
+                :<div style={{fontSize:14,color:V.oS,lineHeight:1.4}}>{ev.pl}</div>}
+              {ev.plAddr&&<div style={{fontSize:12,color:V.tOff,marginTop:1}}>{ev.plAddr}</div>}
+            </div>
+          </div>
+        )}
+        {mapOpen&&<MapViewModal place={ev.pl} address={ev.plAddr} x={ev.plX} y={ev.plY} onClose={()=>setMapOpen(false)}/>}
         <div style={{display:'flex',gap:10,marginTop:8}}>
           <button onClick={()=>onDel(ev.id)} style={{flex:1,padding:13,borderRadius:14,background:'#FFF0F2',color:'#D1213A',fontSize:14,fontWeight:600}}>
             일정 삭제
@@ -644,6 +669,10 @@ function EditSht({ev,onClose,onSave,names,U}){
   const [ts,setTs]=useState(ev.s||'12:00');
   const [te,setTe]=useState(ev.e||'');
   const [mm,setMm]=useState(ev.m||'');
+  const [pl,setPl]=useState(ev.pl||'');
+  const [plAddr,setPlAddr]=useState(ev.plAddr||'');
+  const [plX,setPlX]=useState(ev.plX||'');
+  const [plY,setPlY]=useState(ev.plY||'');
 
   const isRange=sd!==ed;
 
@@ -663,6 +692,7 @@ function EditSht({ev,onClose,onSave,names,U}){
       s:isRange||aD?'':ts,
       e:isRange||aD?'':te,
       m:mm.trim(),
+      pl:pl.trim(), plAddr, plX, plY,
     });
   }
 
@@ -725,6 +755,13 @@ function EditSht({ev,onClose,onSave,names,U}){
             <input type="time" value={te} onChange={e=>setTe(e.target.value)} style={{fontSize:14,color:V.oS,flex:1}}/>
           </FRow>
         </>)}
+
+        {/* 장소 */}
+        {!picker&&(
+          <FRow icon="place" top>
+            <PlacePicker value={pl} address={plAddr} onPick={p=>{setPl(p.name);setPlAddr(p.address);setPlX(p.x);setPlY(p.y);}} placeholder="장소 검색 (선택)"/>
+          </FRow>
+        )}
 
         {/* 메모 */}
         {!picker&&(
