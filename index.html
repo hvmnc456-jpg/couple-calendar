@@ -1719,6 +1719,71 @@ function fmtTrip(sd,ed){
   return ed&&ed!==sd?`${f(sd)} ~ ${f(ed)}`:f(sd);
 }
 
+/* ── 카카오맵 SDK 동적 로더 (장소 검색용) ── */
+const KAKAO_APPKEY='87b5916ab21a6599f79222c5fb37d349';
+let _kakaoP=null;
+function loadKakao(){
+  if(_kakaoP) return _kakaoP;
+  _kakaoP=new Promise((res,rej)=>{
+    if(window.kakao&&window.kakao.maps&&window.kakao.maps.services){return res();}
+    if(window.kakao&&window.kakao.maps){return window.kakao.maps.load(()=>res());}
+    const s=document.createElement('script');
+    s.src='https://dapi.kakao.com/v2/maps/sdk.js?appkey='+KAKAO_APPKEY+'&libraries=services&autoload=false';
+    s.onload=()=>window.kakao.maps.load(()=>res());
+    s.onerror=()=>rej(new Error('kakao sdk load fail'));
+    document.head.appendChild(s);
+  });
+  return _kakaoP;
+}
+
+/* ── 카카오 장소 검색 입력 ── */
+function PlacePicker({value,onChange,onPick,placeholder}){
+  const [open,setOpen]=useState(false);
+  const [results,setResults]=useState([]);
+  const [msg,setMsg]=useState('');
+  const psRef=useRef(null);
+  function search(){
+    const q=(value||'').trim();
+    if(!q){setResults([]);setOpen(false);return;}
+    setMsg('검색 중…');setOpen(true);
+    loadKakao().then(()=>{
+      if(!psRef.current) psRef.current=new window.kakao.maps.services.Places();
+      psRef.current.keywordSearch(q,(data,status)=>{
+        const S=window.kakao.maps.services.Status;
+        if(status===S.OK){setResults(data);setMsg('');}
+        else if(status===S.ZERO_RESULT){setResults([]);setMsg('검색 결과가 없어요');}
+        else{setResults([]);setMsg('검색에 실패했어요');}
+      });
+    }).catch(()=>{setResults([]);setMsg('지도 로딩 실패 (도메인 등록 확인)');});
+  }
+  function pick(p){
+    onPick({name:p.place_name,address:p.road_address_name||p.address_name||'',x:p.x,y:p.y});
+    setOpen(false);setResults([]);setMsg('');
+  }
+  return(
+    <div style={{flex:1,position:'relative'}}>
+      <div style={{display:'flex',alignItems:'center',gap:6}}>
+        <input value={value} onChange={e=>onChange(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();search();}}} placeholder={placeholder} style={{flex:1,fontSize:15,color:V.oS}}/>
+        <button onClick={search} style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,background:V.pC,color:V.pri}}>
+          <span className="material-symbols-outlined" style={{fontSize:18}}>search</span>
+        </button>
+      </div>
+      {open&&(
+        <div style={{marginTop:8,border:`1px solid ${V.ol}`,borderRadius:12,background:V.surf,maxHeight:210,overflowY:'auto',boxShadow:'0 4px 16px rgba(0,0,0,.08)'}}>
+          {msg&&<div style={{padding:'12px 14px',fontSize:13,color:V.oSV}}>{msg}</div>}
+          {results.map(p=>(
+            <div key={p.id} onClick={()=>pick(p)} style={{padding:'10px 14px',borderBottom:`1px solid ${V.ol}`,cursor:'pointer'}}>
+              <div style={{fontSize:14,fontWeight:600,color:V.oS}}>{p.place_name}</div>
+              <div style={{fontSize:12,color:V.oSV,marginTop:2}}>{p.road_address_name||p.address_name}</div>
+              {p.category_name&&<div style={{fontSize:11,color:V.tOff,marginTop:1}}>{p.category_name}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TravelTab({trips=[],onAddTrip,onDelTrip,onUpdatePlans}){
   const [openId,setOpenId]=useState(null);
   const [addTrip,setAddTrip]=useState(false);
@@ -1805,8 +1870,8 @@ function TripAddSht({onClose,onAdd}){
         <FRow icon="title">
           <input value={ti} onChange={e=>setTi(e.target.value)} placeholder="여행 제목 (예: 제주도 여행)" style={{fontSize:15,color:V.oS,fontWeight:500}} autoFocus/>
         </FRow>
-        <FRow icon="place">
-          <input value={dest} onChange={e=>setDest(e.target.value)} placeholder="여행지 (선택)" style={{fontSize:15,color:V.oS}}/>
+        <FRow icon="place" top>
+          <PlacePicker value={dest} onChange={setDest} onPick={p=>setDest(p.name)} placeholder="여행지 검색 (예: 제주도, 부산)"/>
         </FRow>
         <FRow icon="calendar_today" top>
           <div style={{flex:1}}>
@@ -1878,7 +1943,14 @@ function TravelDetail({trip,onBack,onAddPlan,onDelPlan,onDelTrip}){
                 <div style={{fontSize:14.5,fontWeight:600,color:V.oS}}>{p.ti}</div>
                 <button onClick={()=>onDelPlan(curDate,p.id)} style={{color:V.tOff,flexShrink:0,marginTop:1}}><span className="material-symbols-outlined" style={{fontSize:17}}>close</span></button>
               </div>
-              {p.place&&<div style={{fontSize:12.5,color:V.oSV,marginTop:3,display:'flex',alignItems:'center',gap:3}}><span className="material-symbols-outlined" style={{fontSize:14}}>place</span>{p.place}</div>}
+              {p.place&&(
+                <div style={{marginTop:3}}>
+                  {p.px&&p.py
+                    ?<a href={`https://map.kakao.com/link/map/${encodeURIComponent(p.place)},${p.py},${p.px}`} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{fontSize:12.5,color:V.pri,display:'inline-flex',alignItems:'center',gap:3,textDecoration:'none'}}><span className="material-symbols-outlined" style={{fontSize:14}}>place</span>{p.place}</a>
+                    :<div style={{fontSize:12.5,color:V.oSV,display:'flex',alignItems:'center',gap:3}}><span className="material-symbols-outlined" style={{fontSize:14}}>place</span>{p.place}</div>}
+                  {p.placeAddr&&<div style={{fontSize:11.5,color:V.tOff,marginTop:1,paddingLeft:17}}>{p.placeAddr}</div>}
+                </div>
+              )}
               {p.memo&&<div style={{fontSize:12.5,color:V.oSV,marginTop:4}}>{p.memo}</div>}
             </div>
           </div>
@@ -1898,8 +1970,11 @@ function PlanAddSht({dayLabel,onClose,onAdd}){
   const [time,setTime]=useState('');
   const [ti,setTi]=useState('');
   const [place,setPlace]=useState('');
+  const [placeAddr,setPlaceAddr]=useState('');
+  const [px,setPx]=useState('');
+  const [py,setPy]=useState('');
   const [memo,setMemo]=useState('');
-  function submit(){ if(!ti.trim())return; onAdd({time,ti:ti.trim(),place:place.trim(),memo:memo.trim()}); }
+  function submit(){ if(!ti.trim())return; onAdd({time,ti:ti.trim(),place:place.trim(),placeAddr,px,py,memo:memo.trim()}); }
   return(
     <div className="ovl" onClick={onClose}>
       <div className="sht" style={{background:V.surf,padding:'12px 20px 44px'}} onClick={e=>e.stopPropagation()}>
@@ -1911,9 +1986,10 @@ function PlanAddSht({dayLabel,onClose,onAdd}){
         <FRow icon="title">
           <input value={ti} onChange={e=>setTi(e.target.value)} placeholder="일정 내용 (예: 한라산 등반)" style={{fontSize:15,color:V.oS,fontWeight:500}} autoFocus/>
         </FRow>
-        <FRow icon="place">
-          <input value={place} onChange={e=>setPlace(e.target.value)} placeholder="장소 (선택)" style={{fontSize:15,color:V.oS}}/>
+        <FRow icon="place" top>
+          <PlacePicker value={place} onChange={v=>{setPlace(v);setPlaceAddr('');}} onPick={p=>{setPlace(p.name);setPlaceAddr(p.address);setPx(p.x);setPy(p.y);}} placeholder="장소 검색 (예: 한라산, 광안리해수욕장)"/>
         </FRow>
+        {placeAddr&&<div style={{fontSize:12,color:V.oSV,padding:'0 0 4px 31px',marginTop:-4}}>📍 {placeAddr}</div>}
         <FRow icon="notes" top>
           <textarea value={memo} onChange={e=>setMemo(e.target.value)} placeholder="메모 (선택)" rows={2} style={{fontSize:14,color:V.oS}}/>
         </FRow>
