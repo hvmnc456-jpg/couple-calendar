@@ -1741,30 +1741,39 @@ function PlacePicker({value,onChange,onPick,placeholder}){
   const [open,setOpen]=useState(false);
   const [results,setResults]=useState([]);
   const [msg,setMsg]=useState('');
+  const [picked,setPicked]=useState(false);
   const psRef=useRef(null);
-  function search(){
-    const q=(value||'').trim();
-    if(!q){setResults([]);setOpen(false);return;}
-    setMsg('검색 중…');setOpen(true);
+  function runSearch(q){
+    if(!q){setResults([]);setOpen(false);setMsg('');return;}
+    setMsg('검색 중…');setOpen(true);setResults([]);
     loadKakao().then(()=>{
       if(!psRef.current) psRef.current=new window.kakao.maps.services.Places();
       psRef.current.keywordSearch(q,(data,status)=>{
         const S=window.kakao.maps.services.Status;
         if(status===S.OK){setResults(data);setMsg('');}
         else if(status===S.ZERO_RESULT){setResults([]);setMsg('검색 결과가 없어요');}
-        else{setResults([]);setMsg('검색에 실패했어요');}
+        else{setResults([]);setMsg('검색에 실패했어요 (키/도메인 확인)');}
       });
     }).catch(()=>{setResults([]);setMsg('지도 로딩 실패 (도메인 등록 확인)');});
   }
+  // 입력 시 자동 검색 (디바운스 350ms)
+  useEffect(()=>{
+    if(picked) return;
+    const q=(value||'').trim();
+    if(q.length<2){setResults([]);setOpen(false);setMsg('');return;}
+    const t=setTimeout(()=>runSearch(q),350);
+    return()=>clearTimeout(t);
+  },[value,picked]);
   function pick(p){
+    setPicked(true);
     onPick({name:p.place_name,address:p.road_address_name||p.address_name||'',x:p.x,y:p.y});
     setOpen(false);setResults([]);setMsg('');
   }
   return(
     <div style={{flex:1,position:'relative'}}>
       <div style={{display:'flex',alignItems:'center',gap:6}}>
-        <input value={value} onChange={e=>onChange(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();search();}}} placeholder={placeholder} style={{flex:1,fontSize:15,color:V.oS}}/>
-        <button onClick={search} style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,background:V.pC,color:V.pri}}>
+        <input value={value} onChange={e=>{setPicked(false);onChange(e.target.value);}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();runSearch((value||'').trim());}}} placeholder={placeholder} style={{flex:1,fontSize:15,color:V.oS}}/>
+        <button onClick={()=>runSearch((value||'').trim())} style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,background:V.pC,color:V.pri}}>
           <span className="material-symbols-outlined" style={{fontSize:18}}>search</span>
         </button>
       </div>
