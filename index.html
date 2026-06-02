@@ -1719,10 +1719,18 @@ function fmtTrip(sd,ed){
   return ed&&ed!==sd?`${f(sd)} ~ ${f(ed)}`:f(sd);
 }
 
+const TRAVEL_LS='_travel_trips_v1';
 function TravelTab(){
-  const [trips,setTrips]=useState([]);   // {id,ti,dest,sd,ed,plans:{date:[{id,time,ti,place,memo}]}}
+  // 로컬 영구 저장 (탭 전환 시 언마운트돼도 유지). Firestore 연동 전 임시.
+  const [trips,setTrips]=useState(()=>{
+    try{ return JSON.parse(localStorage.getItem(TRAVEL_LS))||[]; }catch(e){ return []; }
+  });
   const [openId,setOpenId]=useState(null);
   const [addTrip,setAddTrip]=useState(false);
+
+  useEffect(()=>{
+    try{ localStorage.setItem(TRAVEL_LS,JSON.stringify(trips)); }catch(e){}
+  },[trips]);
 
   const trip=trips.find(t=>t.id===openId)||null;
 
