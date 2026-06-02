@@ -1,6 +1,6 @@
 // __BUILD__ 값은 배포 스크립트가 매 배포마다 타임스탬프로 치환함
 // → sw.js 바이트가 달라져 브라우저가 새 SW를 감지/설치 (skipWaiting + clients.claim으로 즉시 교체)
-const BUILD = '1780365147561';
+const BUILD = '1780365510848';
 const CACHE = 'couple-calendar-' + BUILD;
 const STATIC = ['/manifest.json', '/icons/icon.svg', '/icons/icon-maskable.svg'];
 
@@ -25,10 +25,12 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = e.request.url;
 
-  // Firebase, CDN, 폰트는 SW 캐시 건너뜀 (자체 캐시 사용)
+  // 크로스 도메인(Firebase, CDN, 폰트, 카카오맵)은 SW 가로채지 않음
+  // ※ 카카오는 Referer로 도메인 검증 → SW가 재요청하면 Referer 변형돼 호출 실패하므로 반드시 우회
   if (url.includes('firestore') || url.includes('firebase') ||
       url.includes('googleapis') || url.includes('gstatic') ||
-      url.includes('unpkg') || url.includes('fonts')) return;
+      url.includes('unpkg') || url.includes('fonts') ||
+      url.includes('kakao') || url.includes('daumcdn')) return;
 
   // ✅ HTML(메인 앱) — 네트워크 우선: 항상 최신 버전 로드, 오프라인 시만 캐시 사용
   if (e.request.mode === 'navigate' ||
