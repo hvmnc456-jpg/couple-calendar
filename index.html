@@ -1695,11 +1695,24 @@ function ProfTab({names:initNames,setNames,coupleStart,setCoupleStart,birthdays:
 /* ═══════════════════════════════════════
    BOTTOM TAB BAR
 ══════════════════════════════════════ */
+function TravelTab(){
+  return(
+    <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:14,background:V.bg}}>
+      <div style={{width:64,height:64,borderRadius:'50%',background:V.pC,display:'flex',alignItems:'center',justifyContent:'center'}}>
+        <span className="material-symbols-outlined" style={{fontSize:32,color:V.pri}}>flight</span>
+      </div>
+      <div style={{fontSize:16,color:V.oSV,fontWeight:600}}>준비중이에요</div>
+      <div style={{fontSize:13,color:V.tOff}}>여행 기능을 준비하고 있어요 ✈️</div>
+    </div>
+  );
+}
+
 function BTBar({active,setActive}){
   const tabs=[
     {id:'calendar',    ic:'calendar_month',lb:'캘린더'},
     {id:'anniversary', ic:'favorite',      lb:'기념일'},
     {id:'bucket',      ic:'checklist',     lb:'버킷리스트'},
+    {id:'travel',      ic:'flight',        lb:'여행'},
     {id:'profile',     ic:'person',        lb:'더보기'},
   ];
   return(
@@ -2170,6 +2183,7 @@ function App(){
         {tab==='calendar'    &&<CalTab evs={evsMapped} addEv={addEv} delEv={delEv} updateEv={updateEv} coupleStart={coupleStart} annList={annList} names={names} U={dynU} holidays={holidays} onFetchYear={fetchHolidaysYear}/>}
         {tab==='anniversary' &&<AnnTab coupleStart={coupleStart} annList={annList} names={names}/>}
         {tab==='bucket'      &&<BkTab items={bkItems} onToggle={toggleBkItem} onAdd={addBkItem} onDel={delBkItem} allCats={allBucketCats} addCustomCat={addCustomCat} customCats={customCats} delCustomCat={deleteCat}/>}
+        {tab==='travel'      &&<TravelTab/>}
         {tab==='profile'     &&<ProfTab names={names} setNames={saveNames} coupleStart={coupleStart} setCoupleStart={saveCoupleStart} birthdays={birthdays} setBirthdays={saveBirthdays} partnerUid={partnerUid} coupleId={coupleId} myUid={myUid} onSwitchCouple={id=>setCoupleId(id)} myGender={myGender} partnerGender={partnerGender} saveGender={saveGender} onReset={handleReset} calName={calName} saveCalName={saveCalName}/>}
       </div>
       <div style={{height:'60px',flexShrink:0}}/>
