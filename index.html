@@ -280,7 +280,7 @@ function CalTab({evs,addEv,delEv,updateEv,coupleStart,annList,names,U,holidays={
           const wStart=nonNull[0],wEnd=nonNull[nonNull.length-1];
 
           /* 이 주에 걸치는 연일 일정 */
-          const wBars=evs.filter(e=>e.ed&&e.ed!==e.dt&&e.dt<=wEnd&&e.ed>=wStart);
+          const wBars=evs.filter(e=>e.ed&&e.ed!==e.dt&&e.dt<=wEnd&&e.ed>=wStart).slice().sort(sortEv);
           /* 이 주에서 단일 일정이 가장 많은 날 기준으로 높이 결정 */
           const wSingleCounts=wDates.map(d=>d?evs.filter(e=>(!e.ed||e.ed===e.dt)&&e.dt===d).length:0);
           const maxSingle=Math.min(MAXPILL,Math.max(0,...wSingleCounts));
