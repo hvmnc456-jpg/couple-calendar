@@ -308,6 +308,8 @@ function CalTab({evs,addEv,delEv,updateEv,coupleStart,annList,names,U,holidays={
                         color:isSel?'#fff':isTod?V.pri:(isHol||col===0)?'#FF453A':col===6?'#5E8EE0':V.oS}}>
                         {day}
                       </span>
+                      {/* 연일 bar가 차지하는 높이만큼 단일 일정 pill을 아래로 밀어 겹침 방지 */}
+                      {wBars.length>0&&<div style={{height:wBars.length*13,flexShrink:0}}/>}
                       {shownEvs.map(ev=>(
                         <div key={ev.id} style={{marginTop:2,fontSize:7.5,fontWeight:600,
                           width:'95%',boxSizing:'border-box',textAlign:'center',
