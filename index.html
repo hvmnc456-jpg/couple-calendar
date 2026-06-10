@@ -1942,8 +1942,13 @@ function TravelTab({trips=[],onAddTrip,onDelTrip,onUpdatePlans,onUpdateSpots}){
     const spots=trip.spots||{};
     onUpdateSpots(trip.id,{...spots,[cat]:(spots[cat]||[]).filter(x=>x.id!==sid)});
   }
+  function editSpot(cat,item){
+    if(!trip) return;
+    const spots=trip.spots||{};
+    onUpdateSpots(trip.id,{...spots,[cat]:(spots[cat]||[]).map(x=>x.id===item.id?item:x)});
+  }
 
-  if(trip) return <TravelDetail trip={trip} onBack={()=>setOpenId(null)} onAddPlan={addPlan} onDelPlan={delPlan} onDelTrip={delTrip} onAddSpot={addSpot} onDelSpot={delSpot}/>;
+  if(trip) return <TravelDetail trip={trip} onBack={()=>setOpenId(null)} onAddPlan={addPlan} onDelPlan={delPlan} onDelTrip={delTrip} onAddSpot={addSpot} onDelSpot={delSpot} onEditSpot={editSpot}/>;
 
   return(
     <div style={{flex:1,overflowY:'auto',background:V.bg}}>
@@ -2026,7 +2031,7 @@ function TripAddSht({onClose,onAdd}){
 
 const SPOT_CATS=[{id:'food',lb:'맛집',ic:'restaurant'},{id:'cafe',lb:'카페',ic:'local_cafe'},{id:'place',lb:'가볼만한 곳',ic:'photo_camera'}];
 
-function TravelDetail({trip,onBack,onAddPlan,onDelPlan,onDelTrip,onAddSpot,onDelSpot}){
+function TravelDetail({trip,onBack,onAddPlan,onDelPlan,onDelTrip,onAddSpot,onDelSpot,onEditSpot}){
   const days=travDays(trip.sd,trip.ed);
   const [dayIdx,setDayIdx]=useState(0);
   const [addPlan,setAddPlan]=useState(false);
@@ -2034,10 +2039,11 @@ function TravelDetail({trip,onBack,onAddPlan,onDelPlan,onDelTrip,onAddSpot,onDel
   const [view,setView]=useState('plan'); // 'plan' | 'spot'
   const [spotCat,setSpotCat]=useState('food');
   const [addSpot,setAddSpot]=useState(false);
+  const [editSpotItem,setEditSpotItem]=useState(null);
   const [mapSpot,setMapSpot]=useState(null);
   const curDate=days[dayIdx]||trip.sd;
   const list=[...(trip.plans?.[curDate]||[])].sort((a,b)=>(a.time||'').localeCompare(b.time||''));
-  const spots=(trip.spots&&trip.spots[spotCat])||[];
+  const spots=[...((trip.spots&&trip.spots[spotCat])||[])].sort((a,b)=>(b.stars||0)-(a.stars||0));
   const wd=['일','월','화','수','목','금','토'];
   function dLabel(s){const[y,m,d]=s.split('-').map(Number);const dt=new Date(y,m-1,d);return `${m}.${d}(${wd[dt.getDay()]})`;}
 
@@ -2134,11 +2140,15 @@ function TravelDetail({trip,onBack,onAddPlan,onDelPlan,onDelTrip,onAddSpot,onDel
           <div key={p.id} style={{display:'flex',gap:10,marginBottom:10,background:V.surf,borderRadius:14,padding:'12px 14px',border:`1px solid ${V.ol}`,boxShadow:'0 1px 4px rgba(0,0,0,.04)'}}>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:14.5,fontWeight:600,color:V.oS}}>{p.name}</div>
-              {p.address&&<div style={{fontSize:12,color:V.oSV,marginTop:2}}>📍 {p.address}</div>}
+              {p.stars>0&&<div style={{display:'flex',gap:1,marginTop:3}}>{[1,2,3,4,5].map(n=><span key={n} className="material-symbols-outlined" style={{fontSize:15,color:n<=p.stars?'#F5B100':V.ol,fontVariationSettings:"'FILL' 1"}}>star</span>)}</div>}
+              {p.address&&<div style={{fontSize:12,color:V.oSV,marginTop:3}}>📍 {p.address}</div>}
               {p.memo&&<div style={{fontSize:12.5,color:V.oSV,marginTop:5,whiteSpace:'pre-wrap',lineHeight:1.45}}>{p.memo}</div>}
               {p.x&&p.y&&<button onClick={()=>setMapSpot(p)} style={{marginTop:6,fontSize:12.5,color:V.pri,display:'inline-flex',alignItems:'center',gap:3,fontWeight:600}}><span className="material-symbols-outlined" style={{fontSize:14}}>map</span>지도 보기</button>}
             </div>
-            <button onClick={()=>onDelSpot(spotCat,p.id)} style={{color:V.tOff,flexShrink:0}}><span className="material-symbols-outlined" style={{fontSize:18}}>close</span></button>
+            <div style={{display:'flex',flexDirection:'column',gap:6,flexShrink:0}}>
+              <button onClick={()=>setEditSpotItem(p)} style={{color:V.oSV}}><span className="material-symbols-outlined" style={{fontSize:18}}>edit</span></button>
+              <button onClick={()=>onDelSpot(spotCat,p.id)} style={{color:V.tOff}}><span className="material-symbols-outlined" style={{fontSize:18}}>close</span></button>
+            </div>
           </div>
         ))}
 
@@ -2151,6 +2161,7 @@ function TravelDetail({trip,onBack,onAddPlan,onDelPlan,onDelTrip,onAddSpot,onDel
       {addPlan&&<PlanAddSht dayLabel={`Day ${dayIdx+1}`} onClose={()=>setAddPlan(false)} onAdd={item=>{onAddPlan(curDate,item);setAddPlan(false);}}/>}
       {mapPlan&&<MapViewModal place={mapPlan.place} address={mapPlan.placeAddr} x={mapPlan.px} y={mapPlan.py} onClose={()=>setMapPlan(null)}/>}
       {addSpot&&<SpotAddSht catLabel={SPOT_CATS.find(c=>c.id===spotCat).lb} onClose={()=>setAddSpot(false)} onAdd={item=>{onAddSpot(spotCat,item);setAddSpot(false);}}/>}
+      {editSpotItem&&<SpotAddSht catLabel={SPOT_CATS.find(c=>c.id===spotCat).lb} initial={editSpotItem} onClose={()=>setEditSpotItem(null)} onAdd={item=>{onEditSpot(spotCat,{...editSpotItem,...item});setEditSpotItem(null);}}/>}
       {mapSpot&&<MapViewModal place={mapSpot.name} address={mapSpot.address} x={mapSpot.x} y={mapSpot.y} onClose={()=>setMapSpot(null)}/>}
     </div>
   );
@@ -2188,28 +2199,42 @@ function PlanAddSht({dayLabel,onClose,onAdd}){
   );
 }
 
-function SpotAddSht({catLabel,onClose,onAdd}){
-  const [name,setName]=useState('');
-  const [address,setAddress]=useState('');
-  const [x,setX]=useState('');
-  const [y,setY]=useState('');
-  const [memo,setMemo]=useState('');
-  function submit(){ if(!name.trim())return; onAdd({name:name.trim(),address,x,y,memo:memo.trim()}); }
+function SpotAddSht({catLabel,initial,onClose,onAdd}){
+  const [name,setName]=useState(initial?.name||'');
+  const [address,setAddress]=useState(initial?.address||'');
+  const [x,setX]=useState(initial?.x||'');
+  const [y,setY]=useState(initial?.y||'');
+  const [memo,setMemo]=useState(initial?.memo||'');
+  const [stars,setStars]=useState(initial?.stars||0);
+  const isEdit=!!initial;
+  function submit(){ if(!name.trim())return; onAdd({name:name.trim(),address,x,y,memo:memo.trim(),stars}); }
   return(
     <div className="ovl" onClick={onClose}>
       <div className="sht" style={{background:V.surf,padding:'12px 20px 44px'}} onClick={e=>e.stopPropagation()}>
         <div style={{width:38,height:4,borderRadius:2,background:'rgba(0,0,0,.1)',margin:'0 auto 18px'}}/>
-        <div style={{fontSize:17,fontWeight:600,color:V.oS,marginBottom:16,letterSpacing:-.3}}>{catLabel} 추가</div>
+        <div style={{fontSize:17,fontWeight:600,color:V.oS,marginBottom:16,letterSpacing:-.3}}>{catLabel} {isEdit?'수정':'추가'}</div>
         <FRow icon="place" top>
           <PlacePicker value={name} address={address} onPick={p=>{setName(p.name);setAddress(p.address);setX(p.x);setY(p.y);}} placeholder="위치 검색 (예: 성수동 카페)"/>
         </FRow>
         <FRow icon="edit">
           <input value={name} onChange={e=>setName(e.target.value)} placeholder="이름 (직접 입력도 가능)" style={{fontSize:15,color:V.oS,fontWeight:500}}/>
         </FRow>
+        <FRow icon="grade" top>
+          <div style={{display:'flex',flexDirection:'column',gap:4}}>
+            <div style={{display:'flex',alignItems:'center',gap:2}}>
+              {[1,2,3,4,5].map(n=>(
+                <button key={n} onClick={()=>setStars(stars===n?n-1:n)} style={{padding:1,lineHeight:0}}>
+                  <span className="material-symbols-outlined" style={{fontSize:30,color:n<=stars?'#F5B100':V.ol,fontVariationSettings:n<=stars?"'FILL' 1":"'FILL' 0"}}>star</span>
+                </button>
+              ))}
+            </div>
+            <div style={{fontSize:11.5,color:V.tOff}}>중요도 {stars}/5 {stars>0&&'· 별점 높은 순으로 정렬돼요'}</div>
+          </div>
+        </FRow>
         <FRow icon="notes" top>
           <textarea value={memo} onChange={e=>setMemo(e.target.value)} placeholder="설명 (예: 분위기 좋고 디저트 맛집!)" rows={3} style={{fontSize:14,color:V.oS}}/>
         </FRow>
-        <button onClick={submit} style={{width:'100%',padding:14,borderRadius:14,background:name.trim()?V.pri:'rgba(0,0,0,.08)',color:name.trim()?'#fff':V.oSV,fontSize:15,fontWeight:600,marginTop:18,transition:'background .2s,color .2s',letterSpacing:-.1}}>추가하기</button>
+        <button onClick={submit} style={{width:'100%',padding:14,borderRadius:14,background:name.trim()?V.pri:'rgba(0,0,0,.08)',color:name.trim()?'#fff':V.oSV,fontSize:15,fontWeight:600,marginTop:18,transition:'background .2s,color .2s',letterSpacing:-.1}}>{isEdit?'수정하기':'추가하기'}</button>
       </div>
     </div>
   );
